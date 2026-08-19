@@ -219,6 +219,15 @@
   .coach-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;background:var(--white);}
   .coach-card .name{font-weight:700;color:var(--green-900);}
   .coach-card .meta{font-size:.78rem;color:var(--ink-soft);}
+  .eval-section{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px;background:var(--cream);}
+  .eval-section-title{margin:0 0 4px;font-family:'Fraunces',serif;color:var(--green-900);font-size:1.02rem;}
+  .eval-criterion{display:grid;grid-template-columns:1fr 180px;gap:12px;align-items:start;padding:8px 0;border-top:1px dashed var(--line);}
+  .eval-criterion:first-of-type{border-top:none;}
+  .eval-criterion-label{font-size:.86rem;font-weight:600;color:var(--ink);}
+  .eval-history-card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:var(--white);}
+  @media(max-width:560px){
+    .eval-criterion{grid-template-columns:1fr;}
+  }
 </style>
 </head>
 <body>
@@ -285,14 +294,51 @@ let ui = {
   editingStudentId: null
 };
 const JOURS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
-const PERF_CATEGORIES = [
-  {key:'technique', label:'Technique'},
-  {key:'petit_jeu', label:'Petit jeu'},
-  {key:'putting', label:'Putting'},
-  {key:'parcours', label:'Parcours'},
-  {key:'mental', label:'Mental'},
-  {key:'attitude', label:'Attitude'},
-  {key:'physique', label:'Physique'}
+const SCORE_LABELS = {1:'Non acquis', 2:'En cours', 3:'Acquis', 4:'Maîtrisé'};
+const EVAL_SECTIONS = [
+  {
+    key:'grand_jeu', label:'Grand Jeu (Driving & Fers)',
+    objectif:'Capacité à produire une trajectoire longue et rectiligne.',
+    criteria:[
+      {key:'posture_grip', label:'Posture et Grip', desc:'Placement des mains, alignement du corps, équilibre.'},
+      {key:'qualite_contact', label:'Qualité du contact', desc:'Centrage de balle dans la face de club.'},
+      {key:'regularite_distance', label:'Régularité et Distance', desc:'Longueur et dispersion de la trajectoire.'}
+    ]
+  },
+  {
+    key:'petit_jeu', label:'Petit Jeu (Chipping & Sorties de bunker)',
+    objectif:'Approcher la balle au plus près du trou depuis les abords du green.',
+    criteria:[
+      {key:'dosage_chipping', label:'Dosage (Chipping)', desc:"Maîtrise de l'amplitude du swing selon la distance."},
+      {key:'choix_club', label:'Choix du club', desc:'Utilisation pertinente du club selon la situation (Sandwedge, Pitching wedge, Fer 7).'}
+    ]
+  },
+  {
+    key:'putting', label:'Putting',
+    objectif:'Limiter le nombre de coups sur le green (viser le « 2-putts » maximum).',
+    criteria:[
+      {key:'lecture_green', label:'Lecture de Green', desc:'Identification des pentes et du sens de la roule.'},
+      {key:'controle_distance', label:'Contrôle de la distance (Dosage)', desc:'Réduction des erreurs de longueur.'},
+      {key:'direction_visee', label:'Direction (Visée)', desc:'Capacité à lancer la balle sur la ligne choisie.'}
+    ]
+  },
+  {
+    key:'strategie', label:'Stratégie & Gestion du Parcours',
+    objectif:'Faire les bons choix pour optimiser son score.',
+    criteria:[
+      {key:'routine_jeu', label:'Routine de jeu', desc:"Mise en place d'une préparation constante avant chaque coup (coup d'essai, visualisation)."},
+      {key:'securite_risque', label:'Sécurité / Prise de risque', desc:'Évitement intelligent des obstacles (bunkers, hors-limites, eau).'}
+    ]
+  },
+  {
+    key:'attitude', label:'Attitude, Étiquette & Sécurité',
+    objectif:'Respecter le jeu, les autres et le terrain.',
+    criteria:[
+      {key:'securite', label:'Sécurité', desc:'Vigilance absolue avant de swinguer (personne dans la zone de danger).'},
+      {key:'respect_terrain', label:'Respect du terrain', desc:'Relevage des pitchs, remplacement des divots, ratissage des bunkers.'},
+      {key:'gestion_emotions', label:'Gestion des émotions', desc:'Résilience face aux mauvais coups et concentration.'}
+    ]
+  }
 ];
 
 /* ---------------------------------------------------------
@@ -300,8 +346,8 @@ const PERF_CATEGORIES = [
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -836,11 +882,18 @@ function viewAlertes(){
 /* ---------------------------------------------------------
    VUE : PERFORMANCE
 --------------------------------------------------------- */
-function scoreAvg(scores){
-  if(!scores) return null;
-  const vals = PERF_CATEGORIES.map(c=>scores[c.key]).filter(v=>v!==undefined && v!==null && v!=='');
+function sectionAverage(sections, sectionKey){
+  const section = EVAL_SECTIONS.find(s=>s.key===sectionKey);
+  if(!section || !sections || !sections[sectionKey]) return null;
+  const vals = section.criteria.map(c=>sections[sectionKey][c.key]).filter(v=>v!==undefined && v!==null && v!=='');
   if(vals.length===0) return null;
   return vals.reduce((a,b)=>a+Number(b),0)/vals.length;
+}
+function globalAverage(sections){
+  if(!sections) return null;
+  const avgs = EVAL_SECTIONS.map(s=>sectionAverage(sections,s.key)).filter(v=>v!==null);
+  if(avgs.length===0) return null;
+  return avgs.reduce((a,b)=>a+b,0)/avgs.length;
 }
 
 function viewPerformance(){
@@ -862,7 +915,7 @@ function viewPerfFiche(){
   const studentId = ui.perfStudent && studentById(ui.perfStudent) ? ui.perfStudent : state.students[0].id;
   ui.perfStudent = studentId;
   const student = studentById(studentId);
-  const evals = state.performance.filter(p=>p.studentId===studentId && p.scores).sort((a,b)=>b.date.localeCompare(a.date));
+  const evals = state.performance.filter(p=>p.studentId===studentId && p.sections).sort((a,b)=>b.date.localeCompare(a.date));
   const latest = evals[0] || null;
   const prev = evals[1] || null;
   const objectifs = state.objectifs.filter(o=>o.studentId===studentId).sort((a,b)=>(b.dateCreation||'').localeCompare(a.dateCreation||''));
@@ -882,19 +935,18 @@ function viewPerfFiche(){
       <p class="helper" style="margin-bottom:14px;">${esc(groupById(student.groupId)?.nom || 'Sans groupe')} ${latest?`· dernier bilan le ${fmtDate(latest.date)}`:''}</p>
       ${ !latest ? `<div class="empty">Aucune évaluation enregistrée pour l'instant.</div>` :
         `<div class="cat-grid">
-          ${PERF_CATEGORIES.map(c=>{
-            const val = latest.scores[c.key];
-            const pval = prev && prev.scores ? prev.scores[c.key] : undefined;
+          ${EVAL_SECTIONS.map(section=>{
+            const val = sectionAverage(latest.sections, section.key);
+            const pval = prev ? sectionAverage(prev.sections, section.key) : null;
             let delta = '';
-            if(val!==undefined && val!==null && val!=='' && pval!==undefined && pval!==null && pval!==''){
-              const diff = Number(val)-Number(pval);
-              delta = diff>0?`<span class="delta up">▲ ${diff}</span>`:diff<0?`<span class="delta down">▼ ${Math.abs(diff)}</span>`:`<span class="delta flat">=</span>`;
+            if(val!==null && pval!==null){
+              const diff = val-pval;
+              delta = diff>0.05?`<span class="delta up">▲ ${diff.toFixed(1)}</span>`:diff<-0.05?`<span class="delta down">▼ ${Math.abs(diff).toFixed(1)}</span>`:`<span class="delta flat">=</span>`;
             }
-            const hasVal = val!==undefined && val!==null && val!=='';
             return `<div class="cat-row">
-              <div class="cat-label">${c.label}</div>
-              <div class="cat-bar-wrap"><div class="cat-bar" style="width:${hasVal?Math.round(val*10):0}%"></div></div>
-              <div class="cat-val">${hasVal?val+'/10':'—'} ${delta}</div>
+              <div class="cat-label">${section.label}</div>
+              <div class="cat-bar-wrap"><div class="cat-bar" style="width:${val!==null?Math.round((val/4)*100):0}%"></div></div>
+              <div class="cat-val">${val!==null?val.toFixed(1)+'/4':'—'} ${delta}</div>
             </div>`;
           }).join('')}
         </div>`
@@ -906,7 +958,7 @@ function viewPerfFiche(){
       <form id="form-add-eval">
         <div class="form-grid">
           <div class="field"><label>Date</label><input type="date" name="date" value="${todayISO()}" required></div>
-          <div class="field"><label>Coach</label>
+          <div class="field"><label>Coach / Évaluateur</label>
             ${ state.coaches.length>0 ? `
               <select name="coachId">
                 <option value="">— Choisir —</option>
@@ -916,12 +968,41 @@ function viewPerfFiche(){
             }
           </div>
         </div>
-        <div class="cat-inputs">
-          ${PERF_CATEGORIES.map(c=>`
-            <div class="field"><label>${c.label} (/10)</label><input type="number" name="score_${c.key}" min="0" max="10" step="1"></div>
-          `).join('')}
+
+        ${EVAL_SECTIONS.map(section=>`
+          <div class="eval-section">
+            <h4 class="eval-section-title">${section.label}</h4>
+            <p class="helper" style="margin:2px 0 10px;">${esc(section.objectif)}</p>
+            ${section.criteria.map(c=>`
+              <div class="eval-criterion">
+                <div class="eval-criterion-label">${c.label}<span class="helper" style="display:block;font-weight:400;">${esc(c.desc)}</span></div>
+                <select name="s_${section.key}__${c.key}">
+                  <option value="">— Non noté —</option>
+                  <option value="1">1 · Non acquis</option>
+                  <option value="2">2 · En cours</option>
+                  <option value="3">3 · Acquis</option>
+                  <option value="4">4 · Maîtrisé</option>
+                </select>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+
+        <div class="eval-section">
+          <h4 class="eval-section-title">Indicateurs de performance chiffrés (test terrain)</h4>
+          <div class="form-grid">
+            <div class="field"><label>Nombre de trous joués</label><input type="number" name="ind_trous" min="0" placeholder="Ex : 9"></div>
+            <div class="field"><label>Score réel (coups)</label><input type="number" name="ind_score" min="0" placeholder="Ex : 45"></div>
+            <div class="field"><label>Fairways touchés</label><input type="number" name="ind_fairways_touches" min="0" placeholder="Ex : 5"></div>
+            <div class="field"><label>Fairways total</label><input type="number" name="ind_fairways_total" min="0" placeholder="Ex : 9"></div>
+            <div class="field"><label>Nombre de putts total</label><input type="number" name="ind_putts" min="0" placeholder="Ex : 20"></div>
+          </div>
+          <p class="helper">Repères : plus de 50 % de fairways touchés · moins de 2 putts par green en moyenne.</p>
         </div>
-        <div class="field" style="margin:12px 0;"><label>Commentaire général</label><textarea name="commentaire" rows="3" placeholder="Ressenti, points à travailler..."></textarea></div>
+
+        <div class="field" style="margin-bottom:12px;"><label>Points forts</label><textarea name="pointsForts" rows="2" placeholder="Ce qui fonctionne bien..."></textarea></div>
+        <div class="field" style="margin-bottom:12px;"><label>Axes prioritaires d'amélioration</label><textarea name="axesAmelioration" rows="2" placeholder="Ce sur quoi travailler en priorité..."></textarea></div>
+
         <button class="btn" type="submit">Enregistrer l'évaluation</button>
       </form>
     </div>
@@ -959,20 +1040,33 @@ function viewPerfFiche(){
     <div class="card">
       <h3 class="perf-h">Historique de progression</h3>
       ${ evals.length===0 ? `<div class="empty">Pas encore d'historique pour cet élève.</div>` :
-        `<div class="scorecard-wrap"><table class="scorecard">
-          <thead><tr><th class="name-col">Date</th><th>Coach</th>${PERF_CATEGORIES.map(c=>`<th>${c.label}</th>`).join('')}<th>Commentaire</th><th></th></tr></thead>
-          <tbody>
-            ${evals.map(e=>`
-              <tr>
-                <td class="name-col">${fmtDate(e.date)}</td>
-                <td>${esc(e.coach)||'—'}</td>
-                ${PERF_CATEGORIES.map(c=>`<td>${e.scores[c.key]!==undefined && e.scores[c.key]!==null && e.scores[c.key]!==''?e.scores[c.key]:'—'}</td>`).join('')}
-                <td style="text-align:left;max-width:220px;">${esc(e.commentaire)||''}</td>
-                <td><button class="btn danger small" data-delete-eval="${e.id}">Suppr.</button></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table></div>`
+        evals.map(e=>{
+          const ind = e.indicateurs || {};
+          const indParts = [];
+          if(ind.scoreReel) indParts.push(`Score ${esc(ind.scoreReel)} coups${ind.scoreTrous?` sur ${esc(ind.scoreTrous)} trous`:''}`);
+          if(ind.fairwaysTouches!==''&&ind.fairwaysTouches!==undefined) indParts.push(`Fairways ${esc(ind.fairwaysTouches)}/${esc(ind.fairwaysTotal)}`);
+          if(ind.puttsTotal) indParts.push(`${esc(ind.puttsTotal)} putts`);
+          return `
+          <div class="eval-history-card">
+            <div class="row-between">
+              <div><strong>${fmtDate(e.date)}</strong>${e.coach?` — ${esc(e.coach)}`:''}</div>
+              <button class="btn danger small" data-delete-eval="${e.id}">Suppr.</button>
+            </div>
+            <div class="cat-grid" style="margin-top:8px;">
+              ${EVAL_SECTIONS.map(section=>{
+                const val = sectionAverage(e.sections, section.key);
+                return `<div class="cat-row">
+                  <div class="cat-label">${section.label}</div>
+                  <div class="cat-bar-wrap"><div class="cat-bar" style="width:${val!==null?Math.round((val/4)*100):0}%"></div></div>
+                  <div class="cat-val">${val!==null?val.toFixed(1)+'/4':'—'}</div>
+                </div>`;
+              }).join('')}
+            </div>
+            ${ indParts.length ? `<div class="helper" style="margin-top:8px;">${indParts.join(' · ')}</div>` : '' }
+            ${ e.pointsForts ? `<div class="helper" style="margin-top:6px;"><strong>Points forts :</strong> ${esc(e.pointsForts)}</div>` : '' }
+            ${ e.axesAmelioration ? `<div class="helper" style="margin-top:4px;"><strong>Axes d'amélioration :</strong> ${esc(e.axesAmelioration)}</div>` : '' }
+          </div>`;
+        }).join('')
       }
     </div>
   `;
@@ -980,43 +1074,43 @@ function viewPerfFiche(){
 
 function viewPerfStats(){
   const studentsWithEval = state.students.map(s=>{
-    const latest = state.performance.filter(p=>p.studentId===s.id && p.scores).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const latest = state.performance.filter(p=>p.studentId===s.id && p.sections).sort((a,b)=>b.date.localeCompare(a.date))[0];
     return {student:s, latest};
   }).filter(x=>x.latest);
   const totalStudents = state.students.length;
   const evaluated = studentsWithEval.length;
 
-  const catAverages = {};
-  PERF_CATEGORIES.forEach(c=>{
-    const vals = studentsWithEval.map(x=>x.latest.scores[c.key]).filter(v=>v!==undefined && v!==null && v!=='');
-    catAverages[c.key] = vals.length ? (vals.reduce((a,b)=>a+Number(b),0)/vals.length) : null;
+  const sectionAverages = {};
+  EVAL_SECTIONS.forEach(section=>{
+    const vals = studentsWithEval.map(x=>sectionAverage(x.latest.sections, section.key)).filter(v=>v!==null);
+    sectionAverages[section.key] = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
   });
-  const globalAvgVals = Object.values(catAverages).filter(v=>v!==null);
+  const globalAvgVals = Object.values(sectionAverages).filter(v=>v!==null);
   const globalAvg = globalAvgVals.length ? (globalAvgVals.reduce((a,b)=>a+b,0)/globalAvgVals.length) : null;
-  const withAvg = PERF_CATEGORIES.filter(c=>catAverages[c.key]!==null);
-  const weakest = withAvg.length ? withAvg.slice().sort((a,b)=>catAverages[a.key]-catAverages[b.key])[0] : null;
+  const withAvg = EVAL_SECTIONS.filter(s=>sectionAverages[s.key]!==null);
+  const weakest = withAvg.length ? withAvg.slice().sort((a,b)=>sectionAverages[a.key]-sectionAverages[b.key])[0] : null;
 
   const totalObj = state.objectifs.length;
   const atteints = state.objectifs.filter(o=>o.statut==='atteint').length;
 
-  const rankedStudents = studentsWithEval.slice().sort((a,b)=>(scoreAvg(a.latest.scores)||0)-(scoreAvg(b.latest.scores)||0));
+  const rankedStudents = studentsWithEval.slice().sort((a,b)=>(globalAverage(a.latest.sections)||0)-(globalAverage(b.latest.sections)||0));
 
   return `
     <div class="stat-row">
       <div class="stat"><div class="num">${evaluated}/${totalStudents}</div><div class="label">Élèves évalués</div></div>
-      <div class="stat"><div class="num">${globalAvg!==null?globalAvg.toFixed(1):'—'}</div><div class="label">Moyenne générale /10</div></div>
+      <div class="stat"><div class="num">${globalAvg!==null?globalAvg.toFixed(1):'—'}</div><div class="label">Moyenne générale /4</div></div>
       <div class="stat"><div class="num">${atteints}/${totalObj}</div><div class="label">Objectifs atteints</div></div>
       <div class="stat alert"><div class="num" style="font-size:1.05rem;">${weakest?weakest.label:'—'}</div><div class="label">Point collectif à travailler</div></div>
     </div>
     <div class="card">
-      <h3 class="perf-h">Moyennes du club par catégorie</h3>
+      <h3 class="perf-h">Moyennes du club par section</h3>
       ${ evaluated===0 ? `<div class="empty">Aucune évaluation enregistrée pour l'instant.</div>` :
         `<div class="cat-grid">
-          ${PERF_CATEGORIES.map(c=>`
+          ${EVAL_SECTIONS.map(section=>`
             <div class="cat-row">
-              <div class="cat-label">${c.label}</div>
-              <div class="cat-bar-wrap"><div class="cat-bar" style="width:${catAverages[c.key]?Math.round(catAverages[c.key]*10):0}%"></div></div>
-              <div class="cat-val">${catAverages[c.key]!==null?catAverages[c.key].toFixed(1)+'/10':'—'}</div>
+              <div class="cat-label">${section.label}</div>
+              <div class="cat-bar-wrap"><div class="cat-bar" style="width:${sectionAverages[section.key]?Math.round((sectionAverages[section.key]/4)*100):0}%"></div></div>
+              <div class="cat-val">${sectionAverages[section.key]!==null?sectionAverages[section.key].toFixed(1)+'/4':'—'}</div>
             </div>
           `).join('')}
         </div>`
@@ -1030,7 +1124,7 @@ function viewPerfStats(){
             <tr>
               <td>${esc(x.student.prenom)} ${esc(x.student.nom)}</td>
               <td>${esc(groupById(x.student.groupId)?.nom||'—')}</td>
-              <td>${scoreAvg(x.latest.scores).toFixed(1)}/10</td>
+              <td>${globalAverage(x.latest.sections).toFixed(1)}/4</td>
               <td>${fmtDate(x.latest.date)}</td>
             </tr>
           `).join('')}
@@ -1095,7 +1189,7 @@ function generateBulletinText(student, monthStr, appreciation){
   const pct = total>0 ? Math.round((present/total)*100) : null;
 
   const perfEntries = state.performance.filter(p=>{
-    if(!p.scores) return false;
+    if(!p.sections) return false;
     const [y,m] = p.date.split('-').map(Number);
     return p.studentId===student.id && y===year && m===month;
   }).sort((a,b)=>a.date.localeCompare(b.date));
@@ -1131,11 +1225,26 @@ function generateBulletinText(student, monthStr, appreciation){
   }else{
     perfEntries.forEach(p=>{
       txt += `\n${fmtDate(p.date)}${p.coach?` — ${p.coach}`:''}\n`;
-      PERF_CATEGORIES.forEach(c=>{
-        const v = p.scores[c.key];
-        if(v!==undefined && v!==null && v!=='') txt += `  ${c.label} : ${v}/10\n`;
+      EVAL_SECTIONS.forEach(section=>{
+        const avg = sectionAverage(p.sections, section.key);
+        if(avg!==null){
+          txt += `  ${section.label} : ${avg.toFixed(1)}/4\n`;
+          section.criteria.forEach(c=>{
+            const v = p.sections[section.key] ? p.sections[section.key][c.key] : undefined;
+            if(v!==undefined && v!==null && v!=='') txt += `    - ${c.label} : ${v}/4 (${SCORE_LABELS[v]||''})\n`;
+          });
+        }
       });
-      if(p.commentaire) txt += `  Commentaire : ${p.commentaire}\n`;
+      if(p.indicateurs){
+        const ind = p.indicateurs;
+        const parts = [];
+        if(ind.scoreReel) parts.push(`Score ${ind.scoreReel} coups${ind.scoreTrous?` sur ${ind.scoreTrous} trous`:''}`);
+        if(ind.fairwaysTouches!=='' && ind.fairwaysTouches!==undefined) parts.push(`Fairways touchés ${ind.fairwaysTouches}/${ind.fairwaysTotal}`);
+        if(ind.puttsTotal) parts.push(`${ind.puttsTotal} putts au total`);
+        if(parts.length) txt += `  Indicateurs terrain : ${parts.join(' · ')}\n`;
+      }
+      if(p.pointsForts) txt += `  Points forts : ${p.pointsForts}\n`;
+      if(p.axesAmelioration) txt += `  Axes d'amélioration : ${p.axesAmelioration}\n`;
     });
   }
 
@@ -1363,16 +1472,30 @@ function bindEvents(){
     formAddEval.addEventListener('submit', async e=>{
       e.preventDefault();
       const fd = new FormData(formAddEval);
-      const scores = {};
-      PERF_CATEGORIES.forEach(c=>{
-        const v = fd.get('score_'+c.key);
-        if(v!==null && v!=='') scores[c.key] = Number(v);
+      const sections = {};
+      EVAL_SECTIONS.forEach(section=>{
+        sections[section.key] = {};
+        section.criteria.forEach(c=>{
+          const v = fd.get(`s_${section.key}__${c.key}`);
+          if(v!==null && v!=='') sections[section.key][c.key] = Number(v);
+        });
       });
+      const indicateurs = {
+        scoreTrous: fd.get('ind_trous')||'',
+        scoreReel: fd.get('ind_score')||'',
+        fairwaysTouches: fd.get('ind_fairways_touches')||'',
+        fairwaysTotal: fd.get('ind_fairways_total')||'',
+        puttsTotal: fd.get('ind_putts')||''
+      };
+      const student = studentById(ui.perfStudent);
       const entry = {
         id:uid(), studentId:ui.perfStudent, date:fd.get('date'),
         coach: fd.has('coachId') ? (()=>{ const c=coachById(fd.get('coachId')); return c ? c.prenom+' '+c.nom : ''; })() : (fd.get('coach')||'').trim(),
         coachId: fd.has('coachId') ? (fd.get('coachId')||null) : null,
-        scores, commentaire:(fd.get('commentaire')||'').trim()
+        niveauGroupe: student ? (groupById(student.groupId)?.nom || '') : '',
+        sections, indicateurs,
+        pointsForts:(fd.get('pointsForts')||'').trim(),
+        axesAmelioration:(fd.get('axesAmelioration')||'').trim()
       };
       state.performance.push(entry);
       await saveState();
