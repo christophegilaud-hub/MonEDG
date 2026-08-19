@@ -300,8 +300,8 @@ const PERF_CATEGORIES = [
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -424,6 +424,7 @@ function studentsOfGroup(groupId){
 function coachesOfGroup(groupId){
   return state.coaches.filter(c=>(c.groupIds||[]).includes(groupId));
 }
+function coachById(id){ return state.coaches.find(c=>c.id===id); }
 function groupById(id){ return state.groups.find(g=>g.id===id); }
 function studentById(id){ return state.students.find(s=>s.id===id); }
 function sessionsOfGroup(groupId){
@@ -749,6 +750,18 @@ function viewPresences(){
       ${ !groupId ? `<div class="empty">Créez d'abord un groupe dans l'onglet « Groupes &amp; élèves ».</div>` :
         eleves.length===0 ? `<div class="empty">Ce groupe n'a pas encore d'élève.</div>` :
         `<form id="form-attendance">
+          ${ state.coaches.length===0 ? `<p class="helper" style="margin-bottom:12px;">Astuce : créez des coachs dans l'onglet « Coachs » pour associer cette séance à un coach.</p>` : `
+          <div class="field" style="max-width:340px;margin-bottom:14px;">
+            <label>Coach de la séance</label>
+            <select name="coachId">
+              <option value="">— Non renseigné —</option>
+              ${state.coaches.map(c=>{
+                const defaultPick = !session && coachesOfGroup(groupId).length===1 && coachesOfGroup(groupId)[0].id===c.id;
+                const selected = session ? session.coachId===c.id : defaultPick;
+                return `<option value="${c.id}" ${selected?'selected':''}>${esc(c.prenom)} ${esc(c.nom)}</option>`;
+              }).join('')}
+            </select>
+          </div>`}
           <div class="inline-actions" style="margin-bottom:10px;">
             <button type="button" class="btn secondary small" id="btn-mark-all-present">✓ Tous présents</button>
             <button type="button" class="btn secondary small" id="btn-mark-all-absent">Tout décocher</button>
@@ -773,12 +786,13 @@ function viewPresences(){
     ${ groupId && past.length>0 ? `
     <div class="card">
       <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Séances récentes</h3>
-      <table><thead><tr><th>Date</th><th>Présents</th><th>Absents</th></tr></thead><tbody>
+      <table><thead><tr><th>Date</th><th>Coach</th><th>Présents</th><th>Absents</th></tr></thead><tbody>
         ${past.map(s=>{
           const vals = Object.values(s.presences||{});
           const present = vals.filter(v=>v===true).length;
           const absent = vals.filter(v=>v===false).length;
-          return `<tr><td>${fmtDate(s.date)}</td><td>${present}</td><td>${absent}</td></tr>`;
+          const coach = s.coachId ? coachById(s.coachId) : null;
+          return `<tr><td>${fmtDate(s.date)}</td><td>${coach?esc(coach.prenom)+' '+esc(coach.nom):'—'}</td><td>${present}</td><td>${absent}</td></tr>`;
         }).join('')}
       </tbody></table>
     </div>` : ''}
@@ -892,7 +906,15 @@ function viewPerfFiche(){
       <form id="form-add-eval">
         <div class="form-grid">
           <div class="field"><label>Date</label><input type="date" name="date" value="${todayISO()}" required></div>
-          <div class="field"><label>Coach</label><input type="text" name="coach" placeholder="Nom du coach"></div>
+          <div class="field"><label>Coach</label>
+            ${ state.coaches.length>0 ? `
+              <select name="coachId">
+                <option value="">— Choisir —</option>
+                ${state.coaches.map(c=>`<option value="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</option>`).join('')}
+              </select>` :
+              `<input type="text" name="coach" placeholder="Nom du coach">`
+            }
+          </div>
         </div>
         <div class="cat-inputs">
           ${PERF_CATEGORIES.map(c=>`
@@ -1288,6 +1310,7 @@ function bindEvents(){
         state.sessions.push(session);
       }
       session.presences = presences;
+      session.coachId = fd.get('coachId') || null;
       await saveState();
       showToast('Présences enregistrées.');
       render();
@@ -1317,7 +1340,8 @@ function bindEvents(){
       });
       const entry = {
         id:uid(), studentId:ui.perfStudent, date:fd.get('date'),
-        coach:(fd.get('coach')||'').trim(),
+        coach: fd.has('coachId') ? (()=>{ const c=coachById(fd.get('coachId')); return c ? c.prenom+' '+c.nom : ''; })() : (fd.get('coach')||'').trim(),
+        coachId: fd.has('coachId') ? (fd.get('coachId')||null) : null,
         scores, commentaire:(fd.get('commentaire')||'').trim()
       };
       state.performance.push(entry);
