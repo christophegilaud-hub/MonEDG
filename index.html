@@ -6,7 +6,6 @@
 <title>Golf du Cognac — Suivi des cours</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root{
     --green-900:#173A2E;
@@ -186,47 +185,22 @@
   @media(max-width:600px){
     .stat-row{grid-template-columns:1fr 1fr;}
   }
-  #login-screen{
-    min-height:100vh;display:flex;align-items:center;justify-content:center;
-    background:var(--green-900);padding:20px;
-  }
-  .login-card{
-    background:var(--cream);border-radius:16px;padding:34px 30px;max-width:360px;width:100%;
-    box-shadow:0 12px 30px rgba(0,0,0,.25);text-align:center;
-  }
-  .login-card h1{font-family:'Fraunces',serif;font-size:1.35rem;color:var(--green-900);margin:10px 0 4px;}
-  .login-card p{color:var(--ink-soft);font-size:.85rem;margin:0 0 18px;}
-  .login-card .field{text-align:left;margin-bottom:12px;}
-  .login-card .btn{width:100%;margin-top:6px;}
-  .login-error{color:var(--red);font-size:.82rem;margin-top:10px;min-height:1em;}
-  .logout-btn{
-    margin-left:auto;background:transparent;border:1px solid var(--sand-light);color:var(--sand-light);
-    padding:7px 12px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;
-  }
-  .logout-btn:hover{background:rgba(255,255,255,.08);}
+  .perf-h{margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);}
+  .cat-grid{display:flex;flex-direction:column;gap:10px;}
+  .cat-row{display:grid;grid-template-columns:110px 1fr 90px;align-items:center;gap:10px;}
+  .cat-label{font-size:.85rem;font-weight:600;color:var(--ink);}
+  .cat-bar-wrap{background:var(--green-100);border-radius:6px;height:10px;overflow:hidden;}
+  .cat-bar{background:var(--sand);height:100%;border-radius:6px;}
+  .cat-val{font-size:.8rem;text-align:right;white-space:nowrap;}
+  .delta{margin-left:4px;font-weight:700;font-size:.76rem;}
+  .delta.up{color:var(--green-700);}
+  .delta.down{color:var(--red);}
+  .delta.flat{color:var(--ink-soft);}
+  .cat-inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:6px;}
 </style>
 </head>
 <body>
 
-<div id="login-screen" style="display:none;">
-  <div class="login-card">
-    <svg class="flagmark" viewBox="0 0 24 24" fill="none" style="margin:0 auto;">
-      <line x1="5" y1="2" x2="5" y2="22" stroke="#173A2E" stroke-width="2" stroke-linecap="round"/>
-      <path d="M5 3 L18 6 L5 10 Z" fill="#C9A227"/>
-      <circle cx="5" cy="22" r="1.6" fill="#173A2E"/>
-    </svg>
-    <h1>Golf du Cognac</h1>
-    <p>Connectez-vous avec le compte fourni par votre association.</p>
-    <form id="form-login">
-      <div class="field"><label>E-mail</label><input type="email" name="email" required autocomplete="username"></div>
-      <div class="field"><label>Mot de passe</label><input type="password" name="password" required autocomplete="current-password"></div>
-      <button class="btn" type="submit">Se connecter</button>
-      <div class="login-error" id="login-error"></div>
-    </form>
-  </div>
-</div>
-
-<div id="main-app" style="display:none;">
 <header class="top">
   <div class="wrap">
     <svg class="flagmark" viewBox="0 0 24 24" fill="none">
@@ -238,14 +212,12 @@
       <h1>Golf du Cognac</h1>
       <p>Suivi des cours &amp; des élèves</p>
     </div>
-    <button class="logout-btn" id="btn-logout">Se déconnecter</button>
   </div>
 </header>
 
 <nav class="tabs" id="tabs"></nav>
 
 <main class="wrap"><div id="app"></div></main>
-</div>
 
 <div class="toast" id="toast"></div>
 
@@ -253,7 +225,7 @@
 /* ---------------------------------------------------------
    ÉTAT
 --------------------------------------------------------- */
-let state = { groups: [], students: [], sessions: [], performance: [] };
+let state = { groups: [], students: [], sessions: [], performance: [], objectifs: [] };
 let ui = {
   tab: 'dashboard',
   selGroupManage: null,
@@ -261,24 +233,24 @@ let ui = {
   attendanceDate: todayISO(),
   alertThreshold: 2,
   perfStudent: null,
+  performanceSubTab: 'fiche',
   bulletinStudent: null,
   bulletinMonth: monthISO(new Date()),
   elevesFilterGroup: 'all',
   elevesSearch: '',
   editingStudentId: null
 };
+const STORAGE_KEY = 'golf-cognac-suivi-v1';
 const JOURS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
-
-/* ---------------------------------------------------------
-   CONFIGURATION SUPABASE
-   -> Collez ici l'URL et la clé "anon public" de votre projet
-      Supabase (Settings > API dans le tableau de bord Supabase).
---------------------------------------------------------- */
-const SUPABASE_URL = 'https://dzyhqyaopansoaddeyhq.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi';
-const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
-
-const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const PERF_CATEGORIES = [
+  {key:'technique', label:'Technique'},
+  {key:'petit_jeu', label:'Petit jeu'},
+  {key:'putting', label:'Putting'},
+  {key:'parcours', label:'Parcours'},
+  {key:'mental', label:'Mental'},
+  {key:'attitude', label:'Attitude'},
+  {key:'physique', label:'Physique'}
+];
 
 function todayISO(){ return new Date().toISOString().slice(0,10); }
 function monthISO(d){ return d.toISOString().slice(0,7); }
@@ -297,64 +269,25 @@ function fmtDate(iso){
 --------------------------------------------------------- */
 async function loadState(){
   try{
-    const { data, error } = await sb.from('app_state').select('data').eq('id', ROW_ID).single();
-    if(error) throw error;
-    if(data && data.data){
-      state = data.data;
+    const res = await window.storage.get(STORAGE_KEY, true);
+    if(res && res.value){
+      state = JSON.parse(res.value);
       state.groups = state.groups || [];
       state.students = state.students || [];
       state.sessions = state.sessions || [];
       state.performance = state.performance || [];
+      state.objectifs = state.objectifs || [];
     }
   }catch(e){
-    // Si la ligne n'existe pas encore, on la crée avec un état vide
-    try{
-      await sb.from('app_state').insert({ id: ROW_ID, data: state });
-    }catch(e2){
-      showToast("Erreur de chargement des données.");
-    }
+    // pas encore de données -> on garde l'état vide
   }
 }
 async function saveState(){
   try{
-    const { error } = await sb.from('app_state').update({ data: state, updated_at: new Date().toISOString() }).eq('id', ROW_ID);
-    if(error) throw error;
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
   }catch(e){
     showToast("Erreur d'enregistrement — réessayez.");
   }
-}
-
-/* ---------------------------------------------------------
-   AUTHENTIFICATION
---------------------------------------------------------- */
-function showLoginScreen(errorMsg){
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('main-app').style.display = 'none';
-  document.getElementById('login-error').textContent = errorMsg || '';
-}
-async function showAppScreen(){
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('main-app').style.display = 'block';
-  document.getElementById('app').innerHTML = `<div class="empty">Chargement des données…</div>`;
-  await loadState();
-  render();
-}
-function bindAuthEvents(){
-  const formLogin = document.getElementById('form-login');
-  formLogin.addEventListener('submit', async e=>{
-    e.preventDefault();
-    const fd = new FormData(formLogin);
-    const email = fd.get('email').trim();
-    const password = fd.get('password');
-    document.getElementById('login-error').textContent = '';
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if(error){
-      document.getElementById('login-error').textContent = "Identifiants incorrects.";
-    }
-  });
-  document.getElementById('btn-logout').addEventListener('click', async ()=>{
-    await sb.auth.signOut();
-  });
 }
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -450,6 +383,7 @@ function viewDashboard(){
   const alerts = computeAlerts(2);
   const nbAlerts = alerts.length;
   const topAlerts = alerts.slice(0,5);
+  const nbObjectifsActifs = state.objectifs.filter(o=>o.statut==='en_cours').length;
   return `
     <h2 class="section-title">Vue d'ensemble</h2>
     <p class="section-sub">L'essentiel de la semaine, en un coup d'œil.</p>
@@ -457,6 +391,7 @@ function viewDashboard(){
       <div class="stat"><div class="num">${nbGroupes}</div><div class="label">Groupes</div></div>
       <div class="stat"><div class="num">${nbEleves}</div><div class="label">Élèves</div></div>
       <div class="stat alert"><div class="num">${nbAlerts}</div><div class="label">Alertes actives</div></div>
+      <div class="stat"><div class="num">${nbObjectifsActifs}</div><div class="label">Objectifs en cours</div></div>
     </div>
     <div class="card">
       <div class="row-between" style="margin-bottom:10px;">
@@ -650,6 +585,10 @@ function viewPresences(){
       ${ !groupId ? `<div class="empty">Créez d'abord un groupe dans l'onglet « Groupes &amp; élèves ».</div>` :
         eleves.length===0 ? `<div class="empty">Ce groupe n'a pas encore d'élève.</div>` :
         `<form id="form-attendance">
+          <div class="inline-actions" style="margin-bottom:10px;">
+            <button type="button" class="btn secondary small" id="btn-mark-all-present">✓ Tous présents</button>
+            <button type="button" class="btn secondary small" id="btn-mark-all-absent">Tout décocher</button>
+          </div>
           <table>
             <thead><tr><th>Élève</th><th style="text-align:center;">Présent</th></tr></thead>
             <tbody>
@@ -719,54 +658,199 @@ function viewAlertes(){
 /* ---------------------------------------------------------
    VUE : PERFORMANCE
 --------------------------------------------------------- */
+function scoreAvg(scores){
+  if(!scores) return null;
+  const vals = PERF_CATEGORIES.map(c=>scores[c.key]).filter(v=>v!==undefined && v!==null && v!=='');
+  if(vals.length===0) return null;
+  return vals.reduce((a,b)=>a+Number(b),0)/vals.length;
+}
+
 function viewPerformance(){
-  const studentId = ui.perfStudent && studentById(ui.perfStudent) ? ui.perfStudent : (state.students[0]?.id || null);
+  return `
+    <h2 class="section-title">Performance</h2>
+    <p class="section-sub">Évaluations techniques, objectifs individuels et statistiques pédagogiques.</p>
+    <div class="inline-actions" style="margin-bottom:16px;">
+      <button class="btn ${ui.performanceSubTab==='fiche'?'':'secondary'} small" data-perf-subtab="fiche">Fiche élève</button>
+      <button class="btn ${ui.performanceSubTab==='stats'?'':'secondary'} small" data-perf-subtab="stats">Statistiques globales</button>
+    </div>
+    ${ ui.performanceSubTab==='stats' ? viewPerfStats() : viewPerfFiche() }
+  `;
+}
+
+function viewPerfFiche(){
+  if(state.students.length===0){
+    return `<div class="empty">Ajoutez d'abord des élèves dans l'onglet « Élèves ».</div>`;
+  }
+  const studentId = ui.perfStudent && studentById(ui.perfStudent) ? ui.perfStudent : state.students[0].id;
   ui.perfStudent = studentId;
-  const notes = studentId ? state.performance.filter(p=>p.studentId===studentId).sort((a,b)=>b.date.localeCompare(a.date)) : [];
+  const student = studentById(studentId);
+  const evals = state.performance.filter(p=>p.studentId===studentId && p.scores).sort((a,b)=>b.date.localeCompare(a.date));
+  const latest = evals[0] || null;
+  const prev = evals[1] || null;
+  const objectifs = state.objectifs.filter(o=>o.studentId===studentId).sort((a,b)=>(b.dateCreation||'').localeCompare(a.dateCreation||''));
 
   return `
-    <h2 class="section-title">Suivi de performance</h2>
-    <p class="section-sub">Le coach note la progression technique de chaque élève, séance après séance.</p>
     <div class="card">
-      <div class="field" style="max-width:340px;">
+      <div class="field" style="max-width:340px;margin-bottom:0;">
         <label>Élève</label>
         <select id="select-perf-student">
-          ${state.students.length===0 ? `<option>Aucun élève</option>` :
-            state.students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${esc(s.prenom)} ${esc(s.nom)} — ${esc(groupById(s.groupId)?.nom||'')}</option>`).join('')
-          }
+          ${state.students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${esc(s.prenom)} ${esc(s.nom)} — ${esc(groupById(s.groupId)?.nom||'')}</option>`).join('')}
         </select>
       </div>
     </div>
 
-    ${ studentId ? `
     <div class="card">
-      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Nouvelle note</h3>
-      <form id="form-add-perf">
+      <h3 class="perf-h">Fiche individuelle — ${esc(student.prenom)} ${esc(student.nom)}</h3>
+      <p class="helper" style="margin-bottom:14px;">${esc(groupById(student.groupId)?.nom || 'Sans groupe')} ${latest?`· dernier bilan le ${fmtDate(latest.date)}`:''}</p>
+      ${ !latest ? `<div class="empty">Aucune évaluation enregistrée pour l'instant.</div>` :
+        `<div class="cat-grid">
+          ${PERF_CATEGORIES.map(c=>{
+            const val = latest.scores[c.key];
+            const pval = prev && prev.scores ? prev.scores[c.key] : undefined;
+            let delta = '';
+            if(val!==undefined && val!==null && val!=='' && pval!==undefined && pval!==null && pval!==''){
+              const diff = Number(val)-Number(pval);
+              delta = diff>0?`<span class="delta up">▲ ${diff}</span>`:diff<0?`<span class="delta down">▼ ${Math.abs(diff)}</span>`:`<span class="delta flat">=</span>`;
+            }
+            const hasVal = val!==undefined && val!==null && val!=='';
+            return `<div class="cat-row">
+              <div class="cat-label">${c.label}</div>
+              <div class="cat-bar-wrap"><div class="cat-bar" style="width:${hasVal?Math.round(val*10):0}%"></div></div>
+              <div class="cat-val">${hasVal?val+'/10':'—'} ${delta}</div>
+            </div>`;
+          }).join('')}
+        </div>`
+      }
+    </div>
+
+    <div class="card">
+      <h3 class="perf-h">Nouvelle évaluation</h3>
+      <form id="form-add-eval">
         <div class="form-grid">
           <div class="field"><label>Date</label><input type="date" name="date" value="${todayISO()}" required></div>
           <div class="field"><label>Coach</label><input type="text" name="coach" placeholder="Nom du coach"></div>
-          <div class="field"><label>Note / 10</label><input type="number" name="note" min="0" max="10" step="1"></div>
         </div>
-        <div class="field" style="margin-bottom:12px;"><label>Commentaire technique</label>
-          <textarea name="commentaire" rows="3" placeholder="Swing, putting, mental, points à travailler..."></textarea>
+        <div class="cat-inputs">
+          ${PERF_CATEGORIES.map(c=>`
+            <div class="field"><label>${c.label} (/10)</label><input type="number" name="score_${c.key}" min="0" max="10" step="1"></div>
+          `).join('')}
         </div>
-        <button class="btn" type="submit">Ajouter la note</button>
+        <div class="field" style="margin:12px 0;"><label>Commentaire général</label><textarea name="commentaire" rows="3" placeholder="Ressenti, points à travailler..."></textarea></div>
+        <button class="btn" type="submit">Enregistrer l'évaluation</button>
       </form>
     </div>
+
     <div class="card">
-      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Historique</h3>
-      ${ notes.length===0 ? `<div class="empty">Pas encore de note pour cet élève.</div>` :
-        notes.map(n=>`
+      <h3 class="perf-h">Objectifs individuels</h3>
+      <form id="form-add-objective" style="margin-bottom:14px;">
+        <div class="form-grid">
+          <div class="field"><label>Objectif</label><input type="text" name="titre" placeholder="Ex : Passer sous les 100 coups" required></div>
+          <div class="field"><label>Échéance</label><input type="date" name="dateCible"></div>
+        </div>
+        <div class="field" style="margin-bottom:10px;"><label>Détail</label><textarea name="description" rows="2" placeholder="Précisions sur l'objectif"></textarea></div>
+        <button class="btn secondary" type="submit">Ajouter l'objectif</button>
+      </form>
+      ${ objectifs.length===0 ? `<div class="empty">Aucun objectif défini pour cet élève.</div>` :
+        objectifs.map(o=>`
           <div class="row-between" style="border-bottom:1px solid var(--line);padding:10px 0;">
             <div>
-              <div><strong>${fmtDate(n.date)}</strong> ${n.coach?`— ${esc(n.coach)}`:''} ${n.note!==''&&n.note!==null&&n.note!==undefined?`<span class="note-star">★ ${esc(n.note)}/10</span>`:''}</div>
-              <div class="helper">${esc(n.commentaire)||''}</div>
+              <div><strong>${esc(o.titre)}</strong> ${o.dateCible?`<span class="helper">— échéance ${fmtDate(o.dateCible)}</span>`:''}</div>
+              ${o.description?`<div class="helper">${esc(o.description)}</div>`:''}
             </div>
-            <button class="btn danger small" data-delete-perf="${n.id}">Supprimer</button>
+            <div class="inline-actions">
+              <select data-objective-status="${o.id}">
+                <option value="en_cours" ${o.statut==='en_cours'?'selected':''}>En cours</option>
+                <option value="atteint" ${o.statut==='atteint'?'selected':''}>Atteint</option>
+                <option value="abandonne" ${o.statut==='abandonne'?'selected':''}>Abandonné</option>
+              </select>
+              <button class="btn danger small" data-delete-objective="${o.id}">Suppr.</button>
+            </div>
           </div>
         `).join('')
       }
-    </div>` : `<div class="empty">Ajoutez d'abord des élèves dans l'onglet « Groupes &amp; élèves ».</div>` }
+    </div>
+
+    <div class="card">
+      <h3 class="perf-h">Historique de progression</h3>
+      ${ evals.length===0 ? `<div class="empty">Pas encore d'historique pour cet élève.</div>` :
+        `<div class="scorecard-wrap"><table class="scorecard">
+          <thead><tr><th class="name-col">Date</th><th>Coach</th>${PERF_CATEGORIES.map(c=>`<th>${c.label}</th>`).join('')}<th>Commentaire</th><th></th></tr></thead>
+          <tbody>
+            ${evals.map(e=>`
+              <tr>
+                <td class="name-col">${fmtDate(e.date)}</td>
+                <td>${esc(e.coach)||'—'}</td>
+                ${PERF_CATEGORIES.map(c=>`<td>${e.scores[c.key]!==undefined && e.scores[c.key]!==null && e.scores[c.key]!==''?e.scores[c.key]:'—'}</td>`).join('')}
+                <td style="text-align:left;max-width:220px;">${esc(e.commentaire)||''}</td>
+                <td><button class="btn danger small" data-delete-eval="${e.id}">Suppr.</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table></div>`
+      }
+    </div>
+  `;
+}
+
+function viewPerfStats(){
+  const studentsWithEval = state.students.map(s=>{
+    const latest = state.performance.filter(p=>p.studentId===s.id && p.scores).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    return {student:s, latest};
+  }).filter(x=>x.latest);
+  const totalStudents = state.students.length;
+  const evaluated = studentsWithEval.length;
+
+  const catAverages = {};
+  PERF_CATEGORIES.forEach(c=>{
+    const vals = studentsWithEval.map(x=>x.latest.scores[c.key]).filter(v=>v!==undefined && v!==null && v!=='');
+    catAverages[c.key] = vals.length ? (vals.reduce((a,b)=>a+Number(b),0)/vals.length) : null;
+  });
+  const globalAvgVals = Object.values(catAverages).filter(v=>v!==null);
+  const globalAvg = globalAvgVals.length ? (globalAvgVals.reduce((a,b)=>a+b,0)/globalAvgVals.length) : null;
+  const withAvg = PERF_CATEGORIES.filter(c=>catAverages[c.key]!==null);
+  const weakest = withAvg.length ? withAvg.slice().sort((a,b)=>catAverages[a.key]-catAverages[b.key])[0] : null;
+
+  const totalObj = state.objectifs.length;
+  const atteints = state.objectifs.filter(o=>o.statut==='atteint').length;
+
+  const rankedStudents = studentsWithEval.slice().sort((a,b)=>(scoreAvg(a.latest.scores)||0)-(scoreAvg(b.latest.scores)||0));
+
+  return `
+    <div class="stat-row">
+      <div class="stat"><div class="num">${evaluated}/${totalStudents}</div><div class="label">Élèves évalués</div></div>
+      <div class="stat"><div class="num">${globalAvg!==null?globalAvg.toFixed(1):'—'}</div><div class="label">Moyenne générale /10</div></div>
+      <div class="stat"><div class="num">${atteints}/${totalObj}</div><div class="label">Objectifs atteints</div></div>
+      <div class="stat alert"><div class="num" style="font-size:1.05rem;">${weakest?weakest.label:'—'}</div><div class="label">Point collectif à travailler</div></div>
+    </div>
+    <div class="card">
+      <h3 class="perf-h">Moyennes du club par catégorie</h3>
+      ${ evaluated===0 ? `<div class="empty">Aucune évaluation enregistrée pour l'instant.</div>` :
+        `<div class="cat-grid">
+          ${PERF_CATEGORIES.map(c=>`
+            <div class="cat-row">
+              <div class="cat-label">${c.label}</div>
+              <div class="cat-bar-wrap"><div class="cat-bar" style="width:${catAverages[c.key]?Math.round(catAverages[c.key]*10):0}%"></div></div>
+              <div class="cat-val">${catAverages[c.key]!==null?catAverages[c.key].toFixed(1)+'/10':'—'}</div>
+            </div>
+          `).join('')}
+        </div>`
+      }
+    </div>
+    <div class="card">
+      <h3 class="perf-h">Détail par élève</h3>
+      ${ studentsWithEval.length===0 ? `<div class="empty">Aucune évaluation enregistrée pour l'instant.</div>` :
+        `<table><thead><tr><th>Élève</th><th>Groupe</th><th>Moyenne dernier bilan</th><th>Date</th></tr></thead><tbody>
+          ${rankedStudents.map(x=>`
+            <tr>
+              <td>${esc(x.student.prenom)} ${esc(x.student.nom)}</td>
+              <td>${esc(groupById(x.student.groupId)?.nom||'—')}</td>
+              <td>${scoreAvg(x.latest.scores).toFixed(1)}/10</td>
+              <td>${fmtDate(x.latest.date)}</td>
+            </tr>
+          `).join('')}
+        </tbody></table>`
+      }
+    </div>
   `;
 }
 
@@ -972,6 +1056,14 @@ function bindEvents(){
   const inpDate = document.getElementById('input-attendance-date');
   if(inpDate) inpDate.addEventListener('change', ()=>{ ui.attendanceDate = inpDate.value; render(); });
   const formAtt = document.getElementById('form-attendance');
+  const btnAllPresent = document.getElementById('btn-mark-all-present');
+  if(btnAllPresent) btnAllPresent.addEventListener('click', ()=>{
+    formAtt.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked = true);
+  });
+  const btnAllAbsent = document.getElementById('btn-mark-all-absent');
+  if(btnAllAbsent) btnAllAbsent.addEventListener('click', ()=>{
+    formAtt.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked = false);
+  });
   if(formAtt){
     formAtt.addEventListener('submit', async e=>{
       e.preventDefault();
@@ -996,30 +1088,77 @@ function bindEvents(){
   if(selThresh) selThresh.addEventListener('change', ()=>{ ui.alertThreshold = Number(selThresh.value); render(); });
 
   // --- PERFORMANCE ---
+  app.querySelectorAll('[data-perf-subtab]').forEach(el=>{
+    el.addEventListener('click', ()=>{ ui.performanceSubTab = el.dataset.perfSubtab; render(); });
+  });
   const selPerf = document.getElementById('select-perf-student');
   if(selPerf) selPerf.addEventListener('change', ()=>{ ui.perfStudent = selPerf.value; render(); });
-  const formPerf = document.getElementById('form-add-perf');
-  if(formPerf){
-    formPerf.addEventListener('submit', async e=>{
+
+  const formAddEval = document.getElementById('form-add-eval');
+  if(formAddEval){
+    formAddEval.addEventListener('submit', async e=>{
       e.preventDefault();
-      const fd = new FormData(formPerf);
-      const p = {
+      const fd = new FormData(formAddEval);
+      const scores = {};
+      PERF_CATEGORIES.forEach(c=>{
+        const v = fd.get('score_'+c.key);
+        if(v!==null && v!=='') scores[c.key] = Number(v);
+      });
+      const entry = {
         id:uid(), studentId:ui.perfStudent, date:fd.get('date'),
         coach:(fd.get('coach')||'').trim(),
-        note: fd.get('note')===''? null : Number(fd.get('note')),
-        commentaire:(fd.get('commentaire')||'').trim()
+        scores, commentaire:(fd.get('commentaire')||'').trim()
       };
-      state.performance.push(p);
+      state.performance.push(entry);
       await saveState();
-      showToast('Note ajoutée.');
+      showToast('Évaluation enregistrée.');
       render();
     });
   }
-  app.querySelectorAll('[data-delete-perf]').forEach(el=>{
+  app.querySelectorAll('[data-delete-eval]').forEach(el=>{
     el.addEventListener('click', async ()=>{
-      state.performance = state.performance.filter(p=>p.id!==el.dataset.deletePerf);
+      if(!confirm('Supprimer cette évaluation ?')) return;
+      state.performance = state.performance.filter(p=>p.id!==el.dataset.deleteEval);
       await saveState();
-      showToast('Note supprimée.');
+      showToast('Évaluation supprimée.');
+      render();
+    });
+  });
+
+  const formAddObjective = document.getElementById('form-add-objective');
+  if(formAddObjective){
+    formAddObjective.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const fd = new FormData(formAddObjective);
+      const titre = fd.get('titre').trim();
+      if(!titre) return;
+      state.objectifs.push({
+        id:uid(), studentId:ui.perfStudent, titre,
+        description:(fd.get('description')||'').trim(),
+        dateCible: fd.get('dateCible') || null,
+        statut:'en_cours', dateCreation: todayISO()
+      });
+      await saveState();
+      showToast('Objectif ajouté.');
+      render();
+    });
+  }
+  app.querySelectorAll('[data-objective-status]').forEach(el=>{
+    el.addEventListener('change', async ()=>{
+      const o = state.objectifs.find(x=>x.id===el.dataset.objectiveStatus);
+      if(!o) return;
+      o.statut = el.value;
+      await saveState();
+      showToast('Objectif mis à jour.');
+      render();
+    });
+  });
+  app.querySelectorAll('[data-delete-objective]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      if(!confirm('Supprimer cet objectif ?')) return;
+      state.objectifs = state.objectifs.filter(o=>o.id!==el.dataset.deleteObjective);
+      await saveState();
+      showToast('Objectif supprimé.');
       render();
     });
   });
@@ -1070,21 +1209,9 @@ function bindEvents(){
    INIT
 --------------------------------------------------------- */
 (async function init(){
-  if(!sb){
-    document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:24px;font-family:sans-serif;">
-      <h2>Configuration manquante</h2>
-      <p>Ouvrez le fichier HTML et remplissez <code>SUPABASE_URL</code> et <code>SUPABASE_ANON_KEY</code> tout en haut de la balise &lt;script&gt;, avec les valeurs de votre projet Supabase (Settings → API).</p>
-    </div>`;
-    return;
-  }
-  bindAuthEvents();
-  const { data: { session } } = await sb.auth.getSession();
-  if(session){ await showAppScreen(); } else { showLoginScreen(); }
-
-  sb.auth.onAuthStateChange(async (event, session)=>{
-    if(event === 'SIGNED_IN'){ await showAppScreen(); }
-    else if(event === 'SIGNED_OUT'){ showLoginScreen(); }
-  });
+  document.getElementById('app').innerHTML = `<div class="empty">Chargement des données…</div>`;
+  await loadState();
+  render();
 })();
 </script>
 </body>
