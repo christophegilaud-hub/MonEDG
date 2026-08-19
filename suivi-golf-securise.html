@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Golf du Cognac — Suivi des cours</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --green-900:#173A2E;
+    --green-700:#2C6650;
+    --green-500:#4F8B6B;
+    --green-100:#E7F0EA;
+    --cream:#F6F3EA;
+    --sand:#C9A227;
+    --sand-light:#F1E4B8;
+    --ink:#26261F;
+    --ink-soft:#5B5B4F;
+    --red:#B3432B;
+    --red-light:#F5DED7;
+    --white:#FFFFFF;
+    --line:#E1DCC9;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px 80px;}
+  header.top{
+    background:var(--green-900);
+    color:var(--cream);
+    padding:28px 20px 22px;
+    border-bottom:4px solid var(--sand);
+  }
+  header.top .wrap{padding:0;display:flex;align-items:center;gap:14px;max-width:960px;margin:0 auto;padding-left:20px;padding-right:20px;}
+  .flagmark{width:34px;height:34px;flex:none;}
+  header.top h1{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:1.5rem;
+    margin:0;
+    letter-spacing:.2px;
+  }
+  header.top p{margin:2px 0 0;font-size:.82rem;color:var(--sand-light);letter-spacing:.4px;text-transform:uppercase;}
+  nav.tabs{
+    display:flex;
+    gap:4px;
+    overflow-x:auto;
+    padding:14px 20px 0;
+    max-width:960px;
+    margin:0 auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  nav.tabs button{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:.86rem;
+    padding:10px 16px;
+    border:none;
+    background:transparent;
+    color:var(--ink-soft);
+    cursor:pointer;
+    border-radius:10px 10px 0 0;
+    white-space:nowrap;
+    border-bottom:3px solid transparent;
+    transition:.15s;
+  }
+  nav.tabs button:hover{background:var(--green-100);}
+  nav.tabs button.active{
+    color:var(--green-900);
+    border-bottom:3px solid var(--sand);
+    background:var(--white);
+  }
+  main{padding-top:22px;}
+  h2.section-title{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:1.35rem;
+    color:var(--green-900);
+    margin:0 0 4px;
+  }
+  p.section-sub{color:var(--ink-soft);margin:0 0 18px;font-size:.92rem;}
+  .card{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px 20px;
+    margin-bottom:16px;
+  }
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
+  .stat{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-left:4px solid var(--sand);
+    border-radius:10px;
+    padding:14px 16px;
+  }
+  .stat .num{font-family:'Fraunces',serif;font-size:1.7rem;font-weight:700;color:var(--green-900);}
+  .stat .label{font-size:.78rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.3px;}
+  .stat.alert{border-left-color:var(--red);}
+  .stat.alert .num{color:var(--red);}
+  .btn{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:.86rem;
+    padding:9px 16px;
+    border-radius:8px;
+    border:1px solid var(--green-700);
+    background:var(--green-700);
+    color:var(--white);
+    cursor:pointer;
+  }
+  .btn:hover{background:var(--green-900);border-color:var(--green-900);}
+  .btn.secondary{background:var(--white);color:var(--green-700);}
+  .btn.secondary:hover{background:var(--green-100);}
+  .btn.danger{background:var(--white);color:var(--red);border-color:var(--red-light);}
+  .btn.danger:hover{background:var(--red-light);}
+  .btn.small{padding:5px 10px;font-size:.76rem;}
+  label{display:block;font-size:.8rem;font-weight:600;color:var(--ink-soft);margin:0 0 4px;}
+  input,select,textarea{
+    font-family:'Inter',sans-serif;
+    font-size:.9rem;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--white);
+    color:var(--ink);
+    width:100%;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--sand);outline-offset:1px;}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:12px;}
+  .field{margin-bottom:0;}
+  .group-card{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:12px 14px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;
+    cursor:pointer;background:var(--white);
+  }
+  .group-card:hover{border-color:var(--green-500);}
+  .group-card.active{border-color:var(--sand);background:var(--sand-light);}
+  .group-card .name{font-weight:700;color:var(--green-900);}
+  .group-card .meta{font-size:.78rem;color:var(--ink-soft);}
+  table{width:100%;border-collapse:collapse;font-size:.88rem;}
+  th{
+    text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.3px;
+    color:var(--ink-soft);border-bottom:2px solid var(--line);padding:8px 6px;
+  }
+  td{padding:9px 6px;border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  .pill{
+    display:inline-block;padding:3px 9px;border-radius:99px;font-size:.72rem;font-weight:700;
+  }
+  .pill.ok{background:var(--green-100);color:var(--green-700);}
+  .pill.warn{background:var(--sand-light);color:#8a6d0f;}
+  .pill.bad{background:var(--red-light);color:var(--red);}
+  input[type=checkbox]{width:20px;height:20px;accent-color:var(--green-700);cursor:pointer;}
+  .row-between{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  .empty{
+    text-align:center;color:var(--ink-soft);padding:30px 10px;font-size:.9rem;border:1px dashed var(--line);border-radius:12px;
+  }
+  .scorecard-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;}
+  .scorecard{border-collapse:collapse;min-width:100%;}
+  .scorecard th, .scorecard td{border:1px solid var(--line);text-align:center;padding:8px 10px;font-size:.82rem;}
+  .scorecard th.name-col, .scorecard td.name-col{text-align:left;position:sticky;left:0;background:var(--white);font-weight:600;color:var(--green-900);}
+  .scorecard th{background:var(--green-100);color:var(--green-900);font-family:'Fraunces',serif;font-weight:600;}
+  .mark-present{color:var(--green-700);font-weight:700;}
+  .mark-absent{color:var(--red);font-weight:700;}
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+    background:var(--green-900);color:var(--cream);padding:10px 20px;border-radius:10px;
+    font-size:.86rem;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.2);
+    opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;
+    z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+  textarea.bulletin{min-height:220px;font-family:'Inter',sans-serif;line-height:1.5;white-space:pre-wrap;}
+  .flag-icon{width:16px;height:16px;flex:none;}
+  .inline-actions{display:flex;gap:6px;}
+  .note-star{color:var(--sand);font-weight:700;}
+  .helper{font-size:.78rem;color:var(--ink-soft);margin-top:4px;}
+  @media(max-width:600px){
+    .stat-row{grid-template-columns:1fr 1fr;}
+  }
+  #login-screen{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:var(--green-900);padding:20px;
+  }
+  .login-card{
+    background:var(--cream);border-radius:16px;padding:34px 30px;max-width:360px;width:100%;
+    box-shadow:0 12px 30px rgba(0,0,0,.25);text-align:center;
+  }
+  .login-card h1{font-family:'Fraunces',serif;font-size:1.35rem;color:var(--green-900);margin:10px 0 4px;}
+  .login-card p{color:var(--ink-soft);font-size:.85rem;margin:0 0 18px;}
+  .login-card .field{text-align:left;margin-bottom:12px;}
+  .login-card .btn{width:100%;margin-top:6px;}
+  .login-error{color:var(--red);font-size:.82rem;margin-top:10px;min-height:1em;}
+  .logout-btn{
+    margin-left:auto;background:transparent;border:1px solid var(--sand-light);color:var(--sand-light);
+    padding:7px 12px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  .logout-btn:hover{background:rgba(255,255,255,.08);}
+</style>
+</head>
+<body>
+
+<div id="login-screen" style="display:none;">
+  <div class="login-card">
+    <svg class="flagmark" viewBox="0 0 24 24" fill="none" style="margin:0 auto;">
+      <line x1="5" y1="2" x2="5" y2="22" stroke="#173A2E" stroke-width="2" stroke-linecap="round"/>
+      <path d="M5 3 L18 6 L5 10 Z" fill="#C9A227"/>
+      <circle cx="5" cy="22" r="1.6" fill="#173A2E"/>
+    </svg>
+    <h1>Golf du Cognac</h1>
+    <p>Connectez-vous avec le compte fourni par votre association.</p>
+    <form id="form-login">
+      <div class="field"><label>E-mail</label><input type="email" name="email" required autocomplete="username"></div>
+      <div class="field"><label>Mot de passe</label><input type="password" name="password" required autocomplete="current-password"></div>
+      <button class="btn" type="submit">Se connecter</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<div id="main-app" style="display:none;">
+<header class="top">
+  <div class="wrap">
+    <svg class="flagmark" viewBox="0 0 24 24" fill="none">
+      <line x1="5" y1="2" x2="5" y2="22" stroke="#F1E4B8" stroke-width="2" stroke-linecap="round"/>
+      <path d="M5 3 L18 6 L5 10 Z" fill="#C9A227"/>
+      <circle cx="5" cy="22" r="1.6" fill="#F1E4B8"/>
+    </svg>
+    <div>
+      <h1>Golf du Cognac</h1>
+      <p>Suivi des cours &amp; des élèves</p>
+    </div>
+    <button class="logout-btn" id="btn-logout">Se déconnecter</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs"></nav>
+
+<main class="wrap"><div id="app"></div></main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------------------------------------------------
+   ÉTAT
+--------------------------------------------------------- */
+let state = { groups: [], students: [], sessions: [], performance: [] };
+let ui = {
+  tab: 'dashboard',
+  selGroupManage: null,
+  selGroupAttendance: null,
+  attendanceDate: todayISO(),
+  alertThreshold: 2,
+  perfStudent: null,
+  bulletinStudent: null,
+  bulletinMonth: monthISO(new Date()),
+  elevesFilterGroup: 'all',
+  elevesSearch: '',
+  editingStudentId: null
+};
+const JOURS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
+/* ---------------------------------------------------------
+   CONFIGURATION SUPABASE
+   -> Collez ici l'URL et la clé "anon public" de votre projet
+      Supabase (Settings > API dans le tableau de bord Supabase).
+--------------------------------------------------------- */
+const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
+
+const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function monthISO(d){ return d.toISOString().slice(0,7); }
+function uid(){ return crypto.randomUUID(); }
+function esc(s){
+  return (s===undefined||s===null?'':String(s))
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
+/* ---------------------------------------------------------
+   PERSISTENCE
+--------------------------------------------------------- */
+async function loadState(){
+  try{
+    const { data, error } = await sb.from('app_state').select('data').eq('id', ROW_ID).single();
+    if(error) throw error;
+    if(data && data.data){
+      state = data.data;
+      state.groups = state.groups || [];
+      state.students = state.students || [];
+      state.sessions = state.sessions || [];
+      state.performance = state.performance || [];
+    }
+  }catch(e){
+    // Si la ligne n'existe pas encore, on la crée avec un état vide
+    try{
+      await sb.from('app_state').insert({ id: ROW_ID, data: state });
+    }catch(e2){
+      showToast("Erreur de chargement des données.");
+    }
+  }
+}
+async function saveState(){
+  try{
+    const { error } = await sb.from('app_state').update({ data: state, updated_at: new Date().toISOString() }).eq('id', ROW_ID);
+    if(error) throw error;
+  }catch(e){
+    showToast("Erreur d'enregistrement — réessayez.");
+  }
+}
+
+/* ---------------------------------------------------------
+   AUTHENTIFICATION
+--------------------------------------------------------- */
+function showLoginScreen(errorMsg){
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('login-error').textContent = errorMsg || '';
+}
+async function showAppScreen(){
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  document.getElementById('app').innerHTML = `<div class="empty">Chargement des données…</div>`;
+  await loadState();
+  render();
+}
+function bindAuthEvents(){
+  const formLogin = document.getElementById('form-login');
+  formLogin.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const fd = new FormData(formLogin);
+    const email = fd.get('email').trim();
+    const password = fd.get('password');
+    document.getElementById('login-error').textContent = '';
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error){
+      document.getElementById('login-error').textContent = "Identifiants incorrects.";
+    }
+  });
+  document.getElementById('btn-logout').addEventListener('click', async ()=>{
+    await sb.auth.signOut();
+  });
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ---------------------------------------------------------
+   TABS
+--------------------------------------------------------- */
+const TABS = [
+  {id:'dashboard', label:'Tableau de bord'},
+  {id:'groupes', label:'Groupes'},
+  {id:'eleves', label:'Élèves'},
+  {id:'presences', label:'Présences'},
+  {id:'alertes', label:'Alertes'},
+  {id:'performance', label:'Performance'},
+  {id:'bulletins', label:'Bulletins'}
+];
+function renderTabs(){
+  const nav = document.getElementById('tabs');
+  nav.innerHTML = TABS.map(t=>
+    `<button data-tab="${t.id}" class="${ui.tab===t.id?'active':''}">${t.label}</button>`
+  ).join('');
+  nav.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click', ()=>{ ui.tab = b.dataset.tab; render(); });
+  });
+}
+
+/* ---------------------------------------------------------
+   HELPERS MÉTIER
+--------------------------------------------------------- */
+function studentsOfGroup(groupId){
+  return state.students.filter(s=>s.groupId===groupId);
+}
+function groupById(id){ return state.groups.find(g=>g.id===id); }
+function studentById(id){ return state.students.find(s=>s.id===id); }
+function sessionsOfGroup(groupId){
+  return state.sessions.filter(s=>s.groupId===groupId).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+// Calcule, pour un élève, la série d'absences consécutives la plus récente
+function consecutiveAbsences(studentId){
+  const st = studentById(studentId);
+  if(!st) return {count:0,lastPresent:null};
+  const sess = sessionsOfGroup(st.groupId).filter(s=>s.date <= todayISO());
+  let count = 0;
+  let lastPresent = null;
+  for(let i=sess.length-1;i>=0;i--){
+    const rec = sess[i].presences ? sess[i].presences[studentId] : undefined;
+    if(rec === undefined) continue; // séance sans info pour cet élève -> on ignore
+    if(rec === true){ lastPresent = sess[i].date; break; }
+    count++;
+  }
+  return {count, lastPresent};
+}
+function computeAlerts(threshold){
+  const list = [];
+  state.students.forEach(st=>{
+    const {count, lastPresent} = consecutiveAbsences(st.id);
+    if(count >= threshold){
+      list.push({student:st, count, lastPresent});
+    }
+  });
+  list.sort((a,b)=>b.count-a.count);
+  return list;
+}
+
+/* ---------------------------------------------------------
+   RENDER PRINCIPAL
+--------------------------------------------------------- */
+function render(){
+  renderTabs();
+  const app = document.getElementById('app');
+  if(ui.tab==='dashboard') app.innerHTML = viewDashboard();
+  else if(ui.tab==='groupes') app.innerHTML = viewGroupes();
+  else if(ui.tab==='eleves') app.innerHTML = viewEleves();
+  else if(ui.tab==='presences') app.innerHTML = viewPresences();
+  else if(ui.tab==='alertes') app.innerHTML = viewAlertes();
+  else if(ui.tab==='performance') app.innerHTML = viewPerformance();
+  else if(ui.tab==='bulletins') app.innerHTML = viewBulletins();
+  bindEvents();
+}
+
+/* ---------------------------------------------------------
+   VUE : DASHBOARD
+--------------------------------------------------------- */
+function viewDashboard(){
+  const nbGroupes = state.groups.length;
+  const nbEleves = state.students.length;
+  const alerts = computeAlerts(2);
+  const nbAlerts = alerts.length;
+  const topAlerts = alerts.slice(0,5);
+  return `
+    <h2 class="section-title">Vue d'ensemble</h2>
+    <p class="section-sub">L'essentiel de la semaine, en un coup d'œil.</p>
+    <div class="stat-row">
+      <div class="stat"><div class="num">${nbGroupes}</div><div class="label">Groupes</div></div>
+      <div class="stat"><div class="num">${nbEleves}</div><div class="label">Élèves</div></div>
+      <div class="stat alert"><div class="num">${nbAlerts}</div><div class="label">Alertes actives</div></div>
+    </div>
+    <div class="card">
+      <div class="row-between" style="margin-bottom:10px;">
+        <h3 style="margin:0;font-family:'Fraunces',serif;color:var(--green-900);">Alertes récentes</h3>
+        <button class="btn secondary small" data-goto="alertes">Voir tout</button>
+      </div>
+      ${ topAlerts.length===0 ? `<div class="empty">Aucune alerte pour le moment. 👍</div>` :
+        `<table><thead><tr><th>Élève</th><th>Groupe</th><th>Absences</th><th>Dernière présence</th></tr></thead><tbody>
+          ${topAlerts.map(a=>`
+            <tr>
+              <td>${esc(a.student.prenom)} ${esc(a.student.nom)}</td>
+              <td>${esc(groupById(a.student.groupId)?.nom || '—')}</td>
+              <td><span class="pill ${a.count>=3?'bad':'warn'}">${a.count} semaine(s)</span></td>
+              <td>${a.lastPresent ? fmtDate(a.lastPresent) : 'jamais enregistrée'}</td>
+            </tr>`).join('')}
+        </tbody></table>`
+      }
+    </div>
+    ${ nbGroupes===0 ? `<div class="empty">Commencez par créer un groupe dans l'onglet <strong>Groupes &amp; élèves</strong>.</div>` : '' }
+  `;
+}
+
+/* ---------------------------------------------------------
+   VUE : GROUPES & ÉLÈVES
+--------------------------------------------------------- */
+function viewGroupes(){
+  const sel = ui.selGroupManage && groupById(ui.selGroupManage) ? ui.selGroupManage : (state.groups[0]?.id || null);
+  ui.selGroupManage = sel;
+  return `
+    <h2 class="section-title">Groupes</h2>
+    <p class="section-sub">Créez vos groupes de cours. La gestion des élèves se fait dans l'onglet « Élèves ».</p>
+
+    <div class="card">
+      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Nouveau groupe</h3>
+      <form id="form-add-group">
+        <div class="form-grid">
+          <div class="field"><label>Nom du groupe</label><input name="nom" placeholder="Ex : Poussins débutants" required></div>
+          <div class="field"><label>Jour du cours</label>
+            <select name="jour">${JOURS.map(j=>`<option>${j}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Horaire</label><input name="heure" type="time" value="14:00" required></div>
+        </div>
+        <button class="btn" type="submit">Créer le groupe</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Groupes existants</h3>
+      ${state.groups.length===0 ? `<div class="empty">Aucun groupe créé pour l'instant.</div>` :
+        state.groups.map(g=>`
+          <div class="group-card ${g.id===sel?'active':''}" data-select-group="${g.id}">
+            <div>
+              <div class="name">${esc(g.nom)}</div>
+              <div class="meta">${g.jour} · ${g.heure} · ${studentsOfGroup(g.id).length} élève(s)</div>
+            </div>
+            <div class="inline-actions">
+              <button class="btn secondary small" data-goto-eleves="${g.id}">Voir les élèves</button>
+              <button class="btn danger small" data-delete-group="${g.id}">Supprimer</button>
+            </div>
+          </div>
+        `).join('')
+      }
+    </div>
+  `;
+}
+
+/* ---------------------------------------------------------
+   VUE : ÉLÈVES (module de gestion dédié)
+--------------------------------------------------------- */
+function viewEleves(){
+  if(state.groups.length===0){
+    return `
+      <h2 class="section-title">Gestion des élèves</h2>
+      <p class="section-sub">Le carnet complet de vos élèves, tous groupes confondus.</p>
+      <div class="empty">Créez d'abord un groupe dans l'onglet « Groupes » avant d'ajouter des élèves.</div>
+    `;
+  }
+
+  const search = ui.elevesSearch.trim().toLowerCase();
+  let list = state.students.slice();
+  if(ui.elevesFilterGroup !== 'all') list = list.filter(s=>s.groupId===ui.elevesFilterGroup);
+  if(search) list = list.filter(s=>
+    (s.prenom+' '+s.nom).toLowerCase().includes(search) ||
+    (s.parentEmail||'').toLowerCase().includes(search)
+  );
+  list.sort((a,b)=> (a.nom+a.prenom).localeCompare(b.nom+b.prenom));
+
+  return `
+    <h2 class="section-title">Gestion des élèves</h2>
+    <p class="section-sub">Le carnet complet de vos élèves, tous groupes confondus : ajout, modification, changement de groupe, suppression.</p>
+
+    <div class="card">
+      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Ajouter un élève</h3>
+      <form id="form-add-student-eleves">
+        <div class="form-grid">
+          <div class="field"><label>Prénom</label><input name="prenom" required></div>
+          <div class="field"><label>Nom</label><input name="nom" required></div>
+          <div class="field"><label>Groupe</label>
+            <select name="groupId">${state.groups.map(g=>`<option value="${g.id}">${esc(g.nom)}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>E-mail parent (optionnel)</label><input name="email" type="email" placeholder="parent@exemple.fr"></div>
+        </div>
+        <button class="btn" type="submit">Ajouter l'élève</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="form-grid" style="margin-bottom:6px;">
+        <div class="field"><label>Filtrer par groupe</label>
+          <select id="select-eleves-filter-group">
+            <option value="all" ${ui.elevesFilterGroup==='all'?'selected':''}>Tous les groupes</option>
+            ${state.groups.map(g=>`<option value="${g.id}" ${ui.elevesFilterGroup===g.id?'selected':''}>${esc(g.nom)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>Rechercher</label>
+          <input id="input-eleves-search" type="text" placeholder="Nom, prénom ou e-mail…" value="${esc(ui.elevesSearch)}">
+        </div>
+      </div>
+
+      ${ list.length===0 ? `<div class="empty">Aucun élève ne correspond.</div>` :
+        `<table><thead><tr><th>Prénom</th><th>Nom</th><th>Groupe</th><th>E-mail parent</th><th></th></tr></thead><tbody>
+          ${list.map(s=>{
+            if(ui.editingStudentId === s.id){
+              return `
+                <tr>
+                  <td colspan="5">
+                    <form id="form-edit-student" data-student-id="${s.id}">
+                      <div class="form-grid">
+                        <div class="field"><label>Prénom</label><input name="prenom" value="${esc(s.prenom)}" required></div>
+                        <div class="field"><label>Nom</label><input name="nom" value="${esc(s.nom)}" required></div>
+                        <div class="field"><label>Groupe</label>
+                          <select name="groupId">${state.groups.map(g=>`<option value="${g.id}" ${g.id===s.groupId?'selected':''}>${esc(g.nom)}</option>`).join('')}</select>
+                        </div>
+                        <div class="field"><label>E-mail parent</label><input name="email" type="email" value="${esc(s.parentEmail)}"></div>
+                      </div>
+                      <div class="inline-actions">
+                        <button class="btn small" type="submit">Enregistrer</button>
+                        <button class="btn secondary small" type="button" data-cancel-edit-student="1">Annuler</button>
+                      </div>
+                    </form>
+                  </td>
+                </tr>`;
+            }
+            return `
+              <tr>
+                <td>${esc(s.prenom)}</td>
+                <td>${esc(s.nom)}</td>
+                <td>${esc(groupById(s.groupId)?.nom || '—')}</td>
+                <td>${esc(s.parentEmail)||'<span class="helper">non renseigné</span>'}</td>
+                <td>
+                  <div class="inline-actions">
+                    <button class="btn secondary small" data-edit-student="${s.id}">Modifier</button>
+                    <button class="btn danger small" data-delete-student="${s.id}">Retirer</button>
+                  </div>
+                </td>
+              </tr>`;
+          }).join('')}
+        </tbody></table>`
+      }
+    </div>
+  `;
+}
+
+/* ---------------------------------------------------------
+   VUE : PRÉSENCES
+--------------------------------------------------------- */
+function viewPresences(){
+  const groupId = ui.selGroupAttendance && groupById(ui.selGroupAttendance) ? ui.selGroupAttendance : (state.groups[0]?.id || null);
+  ui.selGroupAttendance = groupId;
+  const eleves = groupId ? studentsOfGroup(groupId) : [];
+  const date = ui.attendanceDate;
+  const session = groupId ? state.sessions.find(s=>s.groupId===groupId && s.date===date) : null;
+
+  const past = groupId ? sessionsOfGroup(groupId).slice().reverse().slice(0,8) : [];
+
+  return `
+    <h2 class="section-title">Présences</h2>
+    <p class="section-sub">Choisissez un groupe et une date de séance, puis cochez les élèves présents.</p>
+
+    <div class="card">
+      <div class="form-grid" style="align-items:end;">
+        <div class="field"><label>Groupe</label>
+          <select id="select-group-attendance">
+            ${state.groups.map(g=>`<option value="${g.id}" ${g.id===groupId?'selected':''}>${esc(g.nom)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>Date de la séance</label>
+          <input type="date" id="input-attendance-date" value="${date}">
+        </div>
+      </div>
+      ${ !groupId ? `<div class="empty">Créez d'abord un groupe dans l'onglet « Groupes &amp; élèves ».</div>` :
+        eleves.length===0 ? `<div class="empty">Ce groupe n'a pas encore d'élève.</div>` :
+        `<form id="form-attendance">
+          <table>
+            <thead><tr><th>Élève</th><th style="text-align:center;">Présent</th></tr></thead>
+            <tbody>
+              ${eleves.map(s=>{
+                const checked = session && session.presences && session.presences[s.id] === true;
+                return `<tr>
+                  <td>${esc(s.prenom)} ${esc(s.nom)}</td>
+                  <td style="text-align:center;"><input type="checkbox" name="${s.id}" ${checked?'checked':''}></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          <div style="margin-top:14px;"><button class="btn" type="submit">Enregistrer les présences</button></div>
+        </form>`
+      }
+    </div>
+
+    ${ groupId && past.length>0 ? `
+    <div class="card">
+      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Séances récentes</h3>
+      <table><thead><tr><th>Date</th><th>Présents</th><th>Absents</th></tr></thead><tbody>
+        ${past.map(s=>{
+          const vals = Object.values(s.presences||{});
+          const present = vals.filter(v=>v===true).length;
+          const absent = vals.filter(v=>v===false).length;
+          return `<tr><td>${fmtDate(s.date)}</td><td>${present}</td><td>${absent}</td></tr>`;
+        }).join('')}
+      </tbody></table>
+    </div>` : ''}
+  `;
+}
+
+/* ---------------------------------------------------------
+   VUE : ALERTES
+--------------------------------------------------------- */
+function viewAlertes(){
+  const alerts = computeAlerts(ui.alertThreshold);
+  return `
+    <h2 class="section-title">Alertes d'absence</h2>
+    <p class="section-sub">Élèves absents plusieurs semaines de suite, à recontacter.</p>
+    <div class="card">
+      <div class="field" style="max-width:260px;">
+        <label>Seuil d'alerte</label>
+        <select id="select-threshold">
+          <option value="2" ${ui.alertThreshold==2?'selected':''}>2 semaines consécutives</option>
+          <option value="3" ${ui.alertThreshold==3?'selected':''}>3 semaines consécutives</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      ${ alerts.length===0 ? `<div class="empty">Aucun élève ne dépasse ce seuil d'absence. 👍</div>` :
+        `<table><thead><tr><th>Élève</th><th>Groupe</th><th>Absences consécutives</th><th>Dernière présence</th></tr></thead><tbody>
+          ${alerts.map(a=>`
+            <tr>
+              <td>${esc(a.student.prenom)} ${esc(a.student.nom)}</td>
+              <td>${esc(groupById(a.student.groupId)?.nom || '—')}</td>
+              <td><span class="pill ${a.count>=3?'bad':'warn'}">${a.count} semaine(s)</span></td>
+              <td>${a.lastPresent ? fmtDate(a.lastPresent) : 'jamais enregistrée'}</td>
+            </tr>`).join('')}
+        </tbody></table>`
+      }
+    </div>
+    <p class="helper">Le calcul se base sur les séances déjà enregistrées dans l'onglet Présences pour le groupe de chaque élève.</p>
+  `;
+}
+
+/* ---------------------------------------------------------
+   VUE : PERFORMANCE
+--------------------------------------------------------- */
+function viewPerformance(){
+  const studentId = ui.perfStudent && studentById(ui.perfStudent) ? ui.perfStudent : (state.students[0]?.id || null);
+  ui.perfStudent = studentId;
+  const notes = studentId ? state.performance.filter(p=>p.studentId===studentId).sort((a,b)=>b.date.localeCompare(a.date)) : [];
+
+  return `
+    <h2 class="section-title">Suivi de performance</h2>
+    <p class="section-sub">Le coach note la progression technique de chaque élève, séance après séance.</p>
+    <div class="card">
+      <div class="field" style="max-width:340px;">
+        <label>Élève</label>
+        <select id="select-perf-student">
+          ${state.students.length===0 ? `<option>Aucun élève</option>` :
+            state.students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${esc(s.prenom)} ${esc(s.nom)} — ${esc(groupById(s.groupId)?.nom||'')}</option>`).join('')
+          }
+        </select>
+      </div>
+    </div>
+
+    ${ studentId ? `
+    <div class="card">
+      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Nouvelle note</h3>
+      <form id="form-add-perf">
+        <div class="form-grid">
+          <div class="field"><label>Date</label><input type="date" name="date" value="${todayISO()}" required></div>
+          <div class="field"><label>Coach</label><input type="text" name="coach" placeholder="Nom du coach"></div>
+          <div class="field"><label>Note / 10</label><input type="number" name="note" min="0" max="10" step="1"></div>
+        </div>
+        <div class="field" style="margin-bottom:12px;"><label>Commentaire technique</label>
+          <textarea name="commentaire" rows="3" placeholder="Swing, putting, mental, points à travailler..."></textarea>
+        </div>
+        <button class="btn" type="submit">Ajouter la note</button>
+      </form>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Historique</h3>
+      ${ notes.length===0 ? `<div class="empty">Pas encore de note pour cet élève.</div>` :
+        notes.map(n=>`
+          <div class="row-between" style="border-bottom:1px solid var(--line);padding:10px 0;">
+            <div>
+              <div><strong>${fmtDate(n.date)}</strong> ${n.coach?`— ${esc(n.coach)}`:''} ${n.note!==''&&n.note!==null&&n.note!==undefined?`<span class="note-star">★ ${esc(n.note)}/10</span>`:''}</div>
+              <div class="helper">${esc(n.commentaire)||''}</div>
+            </div>
+            <button class="btn danger small" data-delete-perf="${n.id}">Supprimer</button>
+          </div>
+        `).join('')
+      }
+    </div>` : `<div class="empty">Ajoutez d'abord des élèves dans l'onglet « Groupes &amp; élèves ».</div>` }
+  `;
+}
+
+/* ---------------------------------------------------------
+   VUE : BULLETINS
+--------------------------------------------------------- */
+function viewBulletins(){
+  const studentId = ui.bulletinStudent && studentById(ui.bulletinStudent) ? ui.bulletinStudent : (state.students[0]?.id || null);
+  ui.bulletinStudent = studentId;
+  const student = studentId ? studentById(studentId) : null;
+
+  return `
+    <h2 class="section-title">Bulletin mensuel</h2>
+    <p class="section-sub">Génère un résumé de présence et de progression à envoyer aux parents.</p>
+    <div class="card">
+      <div class="form-grid">
+        <div class="field"><label>Élève</label>
+          <select id="select-bulletin-student">
+            ${state.students.length===0 ? `<option>Aucun élève</option>` :
+              state.students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${esc(s.prenom)} ${esc(s.nom)}</option>`).join('')
+            }
+          </select>
+        </div>
+        <div class="field"><label>Mois</label>
+          <input type="month" id="input-bulletin-month" value="${ui.bulletinMonth}">
+        </div>
+      </div>
+      <button class="btn" id="btn-generate-bulletin" ${!student?'disabled':''}>Générer le bulletin</button>
+    </div>
+    <div class="card" id="bulletin-output-wrap" style="display:none;">
+      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Aperçu</h3>
+      <textarea class="bulletin" id="bulletin-text" readonly></textarea>
+      <div class="inline-actions" style="margin-top:12px;">
+        <button class="btn secondary" id="btn-copy-bulletin">Copier le texte</button>
+        <a class="btn" id="btn-mailto-bulletin" href="#" style="text-decoration:none;text-align:center;">Ouvrir dans l'e-mail</a>
+      </div>
+      <p class="helper" id="bulletin-email-warning"></p>
+    </div>
+  `;
+}
+
+function generateBulletinText(student, monthStr){
+  const group = groupById(student.groupId);
+  const [year, month] = monthStr.split('-').map(Number);
+  const sessions = sessionsOfGroup(student.groupId).filter(s=>{
+    const [y,m] = s.date.split('-').map(Number);
+    return y===year && m===month;
+  });
+  const total = sessions.length;
+  let present = 0;
+  sessions.forEach(s=>{ if(s.presences && s.presences[student.id]===true) present++; });
+  const pct = total>0 ? Math.round((present/total)*100) : null;
+
+  const perfEntries = state.performance.filter(p=>{
+    const [y,m] = p.date.split('-').map(Number);
+    return p.studentId===student.id && y===year && m===month;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+
+  const notesAvg = (()=>{
+    const vals = perfEntries.filter(p=>p.note!=='' && p.note!==null && p.note!==undefined).map(p=>Number(p.note));
+    if(vals.length===0) return null;
+    return (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);
+  })();
+
+  const monthLabel = new Date(year, month-1, 1).toLocaleDateString('fr-FR',{month:'long', year:'numeric'});
+
+  let txt = '';
+  txt += `Bulletin mensuel — Golf du Cognac\n`;
+  txt += `${student.prenom} ${student.nom} — Groupe : ${group ? group.nom : '—'}\n`;
+  txt += `Période : ${monthLabel}\n`;
+  txt += `\n--- Assiduité ---\n`;
+  if(total===0){
+    txt += `Aucune séance enregistrée ce mois-ci pour ce groupe.\n`;
+  }else{
+    txt += `Séances prévues : ${total}\n`;
+    txt += `Présences : ${present}/${total} (${pct}%)\n`;
+  }
+  txt += `\n--- Suivi technique du coach ---\n`;
+  if(perfEntries.length===0){
+    txt += `Aucune note de progression enregistrée ce mois-ci.\n`;
+  }else{
+    if(notesAvg) txt += `Note moyenne du mois : ${notesAvg}/10\n\n`;
+    perfEntries.forEach(p=>{
+      txt += `${fmtDate(p.date)}${p.coach?` (${p.coach})`:''}${p.note!==''&&p.note!==null&&p.note!==undefined?` — ${p.note}/10`:''}\n`;
+      if(p.commentaire) txt += `  ${p.commentaire}\n`;
+    });
+  }
+  txt += `\nSportivement,\nL'équipe du Golf du Cognac`;
+  return txt;
+}
+
+/* ---------------------------------------------------------
+   ÉVÉNEMENTS
+--------------------------------------------------------- */
+function bindEvents(){
+  const app = document.getElementById('app');
+
+  app.querySelectorAll('[data-goto]').forEach(b=>{
+    b.addEventListener('click', ()=>{ ui.tab = b.dataset.goto; render(); });
+  });
+
+  // --- GROUPES ---
+  const formAddGroup = document.getElementById('form-add-group');
+  if(formAddGroup){
+    formAddGroup.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const fd = new FormData(formAddGroup);
+      const g = {id:uid(), nom:fd.get('nom').trim(), jour:fd.get('jour'), heure:fd.get('heure')};
+      if(!g.nom) return;
+      state.groups.push(g);
+      ui.selGroupManage = g.id;
+      await saveState();
+      showToast('Groupe créé.');
+      render();
+    });
+  }
+  app.querySelectorAll('[data-select-group]').forEach(el=>{
+    el.addEventListener('click', ()=>{ ui.selGroupManage = el.dataset.selectGroup; render(); });
+  });
+  app.querySelectorAll('[data-delete-group]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      if(!confirm('Supprimer ce groupe et tous ses élèves ?')) return;
+      const gid = el.dataset.deleteGroup;
+      const studentIds = studentsOfGroup(gid).map(s=>s.id);
+      state.groups = state.groups.filter(g=>g.id!==gid);
+      state.students = state.students.filter(s=>s.groupId!==gid);
+      state.sessions = state.sessions.filter(s=>s.groupId!==gid);
+      state.performance = state.performance.filter(p=>!studentIds.includes(p.studentId));
+      if(ui.selGroupManage===gid) ui.selGroupManage = null;
+      await saveState();
+      showToast('Groupe supprimé.');
+      render();
+    });
+  });
+  app.querySelectorAll('[data-goto-eleves]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      ui.elevesFilterGroup = el.dataset.gotoEleves;
+      ui.tab = 'eleves';
+      render();
+    });
+  });
+
+  // --- ÉLÈVES (module dédié) ---
+  const formAddStudentEleves = document.getElementById('form-add-student-eleves');
+  if(formAddStudentEleves){
+    formAddStudentEleves.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const fd = new FormData(formAddStudentEleves);
+      const s = {id:uid(), prenom:fd.get('prenom').trim(), nom:fd.get('nom').trim(), parentEmail:(fd.get('email')||'').trim(), groupId:fd.get('groupId')};
+      if(!s.prenom || !s.nom || !s.groupId) return;
+      state.students.push(s);
+      await saveState();
+      showToast('Élève ajouté.');
+      render();
+    });
+  }
+  const selElevesFilter = document.getElementById('select-eleves-filter-group');
+  if(selElevesFilter) selElevesFilter.addEventListener('change', ()=>{ ui.elevesFilterGroup = selElevesFilter.value; render(); });
+  const inpElevesSearch = document.getElementById('input-eleves-search');
+  if(inpElevesSearch){
+    inpElevesSearch.addEventListener('input', ()=>{ ui.elevesSearch = inpElevesSearch.value; });
+    inpElevesSearch.addEventListener('change', ()=>{ ui.elevesSearch = inpElevesSearch.value; render(); });
+  }
+  app.querySelectorAll('[data-edit-student]').forEach(el=>{
+    el.addEventListener('click', ()=>{ ui.editingStudentId = el.dataset.editStudent; render(); });
+  });
+  app.querySelectorAll('[data-cancel-edit-student]').forEach(el=>{
+    el.addEventListener('click', ()=>{ ui.editingStudentId = null; render(); });
+  });
+  const formEditStudent = document.getElementById('form-edit-student');
+  if(formEditStudent){
+    formEditStudent.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const sid = formEditStudent.dataset.studentId;
+      const fd = new FormData(formEditStudent);
+      const s = studentById(sid);
+      if(!s) return;
+      s.prenom = fd.get('prenom').trim();
+      s.nom = fd.get('nom').trim();
+      s.groupId = fd.get('groupId');
+      s.parentEmail = (fd.get('email')||'').trim();
+      ui.editingStudentId = null;
+      await saveState();
+      showToast('Élève modifié.');
+      render();
+    });
+  }
+  app.querySelectorAll('[data-delete-student]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      if(!confirm('Retirer cet élève ?')) return;
+      const sid = el.dataset.deleteStudent;
+      state.students = state.students.filter(s=>s.id!==sid);
+      state.performance = state.performance.filter(p=>p.studentId!==sid);
+      await saveState();
+      showToast('Élève retiré.');
+      render();
+    });
+  });
+
+  // --- PRÉSENCES ---
+  const selGA = document.getElementById('select-group-attendance');
+  if(selGA) selGA.addEventListener('change', ()=>{ ui.selGroupAttendance = selGA.value; render(); });
+  const inpDate = document.getElementById('input-attendance-date');
+  if(inpDate) inpDate.addEventListener('change', ()=>{ ui.attendanceDate = inpDate.value; render(); });
+  const formAtt = document.getElementById('form-attendance');
+  if(formAtt){
+    formAtt.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const fd = new FormData(formAtt);
+      const eleves = studentsOfGroup(ui.selGroupAttendance);
+      const presences = {};
+      eleves.forEach(s=>{ presences[s.id] = fd.get(s.id) === 'on'; });
+      let session = state.sessions.find(s=>s.groupId===ui.selGroupAttendance && s.date===ui.attendanceDate);
+      if(!session){
+        session = {id:uid(), groupId:ui.selGroupAttendance, date:ui.attendanceDate, presences:{}};
+        state.sessions.push(session);
+      }
+      session.presences = presences;
+      await saveState();
+      showToast('Présences enregistrées.');
+      render();
+    });
+  }
+
+  // --- ALERTES ---
+  const selThresh = document.getElementById('select-threshold');
+  if(selThresh) selThresh.addEventListener('change', ()=>{ ui.alertThreshold = Number(selThresh.value); render(); });
+
+  // --- PERFORMANCE ---
+  const selPerf = document.getElementById('select-perf-student');
+  if(selPerf) selPerf.addEventListener('change', ()=>{ ui.perfStudent = selPerf.value; render(); });
+  const formPerf = document.getElementById('form-add-perf');
+  if(formPerf){
+    formPerf.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const fd = new FormData(formPerf);
+      const p = {
+        id:uid(), studentId:ui.perfStudent, date:fd.get('date'),
+        coach:(fd.get('coach')||'').trim(),
+        note: fd.get('note')===''? null : Number(fd.get('note')),
+        commentaire:(fd.get('commentaire')||'').trim()
+      };
+      state.performance.push(p);
+      await saveState();
+      showToast('Note ajoutée.');
+      render();
+    });
+  }
+  app.querySelectorAll('[data-delete-perf]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      state.performance = state.performance.filter(p=>p.id!==el.dataset.deletePerf);
+      await saveState();
+      showToast('Note supprimée.');
+      render();
+    });
+  });
+
+  // --- BULLETINS ---
+  const selBS = document.getElementById('select-bulletin-student');
+  if(selBS) selBS.addEventListener('change', ()=>{ ui.bulletinStudent = selBS.value; render(); });
+  const inpBM = document.getElementById('input-bulletin-month');
+  if(inpBM) inpBM.addEventListener('change', ()=>{ ui.bulletinMonth = inpBM.value; });
+  const btnGen = document.getElementById('btn-generate-bulletin');
+  if(btnGen){
+    btnGen.addEventListener('click', ()=>{
+      const student = studentById(ui.bulletinStudent);
+      if(!student) return;
+      const monthVal = document.getElementById('input-bulletin-month').value || ui.bulletinMonth;
+      ui.bulletinMonth = monthVal;
+      const txt = generateBulletinText(student, monthVal);
+      document.getElementById('bulletin-output-wrap').style.display = 'block';
+      document.getElementById('bulletin-text').value = txt;
+      const mailLink = document.getElementById('btn-mailto-bulletin');
+      const warn = document.getElementById('bulletin-email-warning');
+      if(student.parentEmail){
+        const subject = encodeURIComponent(`Bulletin mensuel — ${student.prenom} ${student.nom}`);
+        const body = encodeURIComponent(txt);
+        mailLink.href = `mailto:${student.parentEmail}?subject=${subject}&body=${body}`;
+        warn.textContent = `Sera envoyé à : ${student.parentEmail}`;
+      }else{
+        mailLink.href = '#';
+        mailLink.addEventListener('click', ev=>ev.preventDefault(), {once:true});
+        warn.textContent = "Aucun e-mail parent renseigné pour cet élève — ajoutez-le dans l'onglet Groupes & élèves.";
+      }
+    });
+  }
+  const btnCopy = document.getElementById('btn-copy-bulletin');
+  if(btnCopy){
+    btnCopy.addEventListener('click', ()=>{
+      const ta = document.getElementById('bulletin-text');
+      ta.select();
+      navigator.clipboard.writeText(ta.value).then(()=>showToast('Texte copié.')).catch(()=>{
+        document.execCommand('copy');
+        showToast('Texte copié.');
+      });
+    });
+  }
+}
+
+/* ---------------------------------------------------------
+   INIT
+--------------------------------------------------------- */
+(async function init(){
+  if(!sb){
+    document.body.innerHTML = `<div style="max-width:520px;margin:60px auto;padding:24px;font-family:sans-serif;">
+      <h2>Configuration manquante</h2>
+      <p>Ouvrez le fichier HTML et remplissez <code>SUPABASE_URL</code> et <code>SUPABASE_ANON_KEY</code> tout en haut de la balise &lt;script&gt;, avec les valeurs de votre projet Supabase (Settings → API).</p>
+    </div>`;
+    return;
+  }
+  bindAuthEvents();
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){ await showAppScreen(); } else { showLoginScreen(); }
+
+  sb.auth.onAuthStateChange(async (event, session)=>{
+    if(event === 'SIGNED_IN'){ await showAppScreen(); }
+    else if(event === 'SIGNED_OUT'){ showLoginScreen(); }
+  });
+})();
+</script>
+</body>
+</html>
