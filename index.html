@@ -216,6 +216,9 @@
   .delta.down{color:var(--red);}
   .delta.flat{color:var(--ink-soft);}
   .cat-inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:6px;}
+  .coach-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;background:var(--white);}
+  .coach-card .name{font-weight:700;color:var(--green-900);}
+  .coach-card .meta{font-size:.78rem;color:var(--ink-soft);}
 </style>
 </head>
 <body>
@@ -265,7 +268,7 @@
 /* ---------------------------------------------------------
    ÉTAT
 --------------------------------------------------------- */
-let state = { groups: [], students: [], sessions: [], performance: [], objectifs: [] };
+let state = { groups: [], students: [], sessions: [], performance: [], objectifs: [], coaches: [] };
 let ui = {
   tab: 'dashboard',
   selGroupManage: null,
@@ -274,6 +277,7 @@ let ui = {
   alertThreshold: 2,
   perfStudent: null,
   performanceSubTab: 'fiche',
+  editingCoachId: null,
   bulletinStudent: null,
   bulletinMonth: monthISO(new Date()),
   elevesFilterGroup: 'all',
@@ -296,8 +300,8 @@ const PERF_CATEGORIES = [
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -328,6 +332,7 @@ async function loadState(){
       state.sessions = state.sessions || [];
       state.performance = state.performance || [];
       state.objectifs = state.objectifs || [];
+      state.coaches = state.coaches || [];
     }
   }catch(e){
     // Si la ligne n'existe pas encore, on la crée avec un état vide
@@ -393,6 +398,7 @@ function showToast(msg){
 const TABS = [
   {id:'dashboard', label:'Tableau de bord'},
   {id:'groupes', label:'Groupes'},
+  {id:'coachs', label:'Coachs'},
   {id:'eleves', label:'Élèves'},
   {id:'presences', label:'Présences'},
   {id:'alertes', label:'Alertes'},
@@ -414,6 +420,9 @@ function renderTabs(){
 --------------------------------------------------------- */
 function studentsOfGroup(groupId){
   return state.students.filter(s=>s.groupId===groupId);
+}
+function coachesOfGroup(groupId){
+  return state.coaches.filter(c=>(c.groupIds||[]).includes(groupId));
 }
 function groupById(id){ return state.groups.find(g=>g.id===id); }
 function studentById(id){ return state.students.find(s=>s.id===id); }
@@ -456,6 +465,7 @@ function render(){
   const app = document.getElementById('app');
   if(ui.tab==='dashboard') app.innerHTML = viewDashboard();
   else if(ui.tab==='groupes') app.innerHTML = viewGroupes();
+  else if(ui.tab==='coachs') app.innerHTML = viewCoachs();
   else if(ui.tab==='eleves') app.innerHTML = viewEleves();
   else if(ui.tab==='presences') app.innerHTML = viewPresences();
   else if(ui.tab==='alertes') app.innerHTML = viewAlertes();
@@ -474,12 +484,14 @@ function viewDashboard(){
   const nbAlerts = alerts.length;
   const topAlerts = alerts.slice(0,5);
   const nbObjectifsActifs = state.objectifs.filter(o=>o.statut==='en_cours').length;
+  const nbCoachs = state.coaches.length;
   return `
     <h2 class="section-title">Vue d'ensemble</h2>
     <p class="section-sub">L'essentiel de la semaine, en un coup d'œil.</p>
     <div class="stat-row">
       <div class="stat"><div class="num">${nbGroupes}</div><div class="label">Groupes</div></div>
       <div class="stat"><div class="num">${nbEleves}</div><div class="label">Élèves</div></div>
+      <div class="stat"><div class="num">${nbCoachs}</div><div class="label">Coachs</div></div>
       <div class="stat alert"><div class="num">${nbAlerts}</div><div class="label">Alertes actives</div></div>
       <div class="stat"><div class="num">${nbObjectifsActifs}</div><div class="label">Objectifs en cours</div></div>
     </div>
@@ -535,7 +547,7 @@ function viewGroupes(){
           <div class="group-card ${g.id===sel?'active':''}" data-select-group="${g.id}">
             <div>
               <div class="name">${esc(g.nom)}</div>
-              <div class="meta">${g.jour} · ${g.heure} · ${studentsOfGroup(g.id).length} élève(s)</div>
+              <div class="meta">${g.jour} · ${g.heure} · ${studentsOfGroup(g.id).length} élève(s)${coachesOfGroup(g.id).length?` · Coach : ${coachesOfGroup(g.id).map(c=>esc(c.prenom)+' '+esc(c.nom)).join(', ')}`:''}</div>
             </div>
             <div class="inline-actions">
               <button class="btn secondary small" data-goto-eleves="${g.id}">Voir les élèves</button>
@@ -543,6 +555,68 @@ function viewGroupes(){
             </div>
           </div>
         `).join('')
+      }
+    </div>
+  `;
+}
+
+/* ---------------------------------------------------------
+   VUE : COACHS
+--------------------------------------------------------- */
+function viewCoachs(){
+  return `
+    <h2 class="section-title">Coachs</h2>
+    <p class="section-sub">Créez vos coachs et assignez-les aux groupes qu'ils encadrent.</p>
+
+    <div class="card">
+      <h3 class="perf-h">Nouveau coach</h3>
+      <form id="form-add-coach">
+        <div class="form-grid">
+          <div class="field"><label>Prénom</label><input name="prenom" required></div>
+          <div class="field"><label>Nom</label><input name="nom" required></div>
+          <div class="field"><label>E-mail (optionnel)</label><input name="email" type="email" placeholder="coach@exemple.fr"></div>
+        </div>
+        <button class="btn" type="submit">Ajouter le coach</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3 class="perf-h">Coachs</h3>
+      ${ state.coaches.length===0 ? `<div class="empty">Aucun coach créé pour l'instant.</div>` :
+        state.coaches.map(c=>{
+          const assignedGroups = state.groups.filter(g=>(c.groupIds||[]).includes(g.id));
+          const editing = ui.editingCoachId === c.id;
+          return `
+            <div class="coach-card">
+              <div class="row-between">
+                <div>
+                  <div class="name">${esc(c.prenom)} ${esc(c.nom)}</div>
+                  <div class="meta">${esc(c.email)||'pas d\'e-mail renseigné'}</div>
+                </div>
+                <div class="inline-actions">
+                  <button class="btn secondary small" data-toggle-edit-coach="${c.id}">${editing?'Fermer':'Gérer les groupes'}</button>
+                  <button class="btn danger small" data-delete-coach="${c.id}">Supprimer</button>
+                </div>
+              </div>
+              <div style="margin-top:8px;">
+                ${ assignedGroups.length===0 ? `<span class="helper">Aucun groupe assigné</span>` :
+                  assignedGroups.map(g=>`<span class="pill ok" style="margin-right:6px;">${esc(g.nom)}</span>`).join('')
+                }
+              </div>
+              ${ editing ? `
+                <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px;">
+                  ${ state.groups.length===0 ? `<div class="helper">Créez d'abord des groupes dans l'onglet « Groupes ».</div>` :
+                    state.groups.map(g=>`
+                      <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:6px;font-size:.88rem;">
+                        <input type="checkbox" data-coach-group="${c.id}|${g.id}" ${(c.groupIds||[]).includes(g.id)?'checked':''}>
+                        <span>${esc(g.nom)} <span class="helper">(${g.jour} ${g.heure})</span></span>
+                      </label>
+                    `).join('')
+                  }
+                </div>` : ''}
+            </div>
+          `;
+        }).join('')
       }
     </div>
   `;
@@ -1040,6 +1114,53 @@ function bindEvents(){
 
   app.querySelectorAll('[data-goto]').forEach(b=>{
     b.addEventListener('click', ()=>{ ui.tab = b.dataset.goto; render(); });
+  });
+
+  // --- COACHS ---
+  const formAddCoach = document.getElementById('form-add-coach');
+  if(formAddCoach){
+    formAddCoach.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const fd = new FormData(formAddCoach);
+      const c = {id:uid(), prenom:fd.get('prenom').trim(), nom:fd.get('nom').trim(), email:(fd.get('email')||'').trim(), groupIds:[]};
+      if(!c.prenom || !c.nom) return;
+      state.coaches.push(c);
+      await saveState();
+      showToast('Coach ajouté.');
+      render();
+    });
+  }
+  app.querySelectorAll('[data-toggle-edit-coach]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.dataset.toggleEditCoach;
+      ui.editingCoachId = ui.editingCoachId===id ? null : id;
+      render();
+    });
+  });
+  app.querySelectorAll('[data-delete-coach]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      if(!confirm('Supprimer ce coach ?')) return;
+      state.coaches = state.coaches.filter(c=>c.id!==el.dataset.deleteCoach);
+      await saveState();
+      showToast('Coach supprimé.');
+      render();
+    });
+  });
+  app.querySelectorAll('[data-coach-group]').forEach(el=>{
+    el.addEventListener('change', async ()=>{
+      const [coachId, groupId] = el.dataset.coachGroup.split('|');
+      const coach = state.coaches.find(c=>c.id===coachId);
+      if(!coach) return;
+      coach.groupIds = coach.groupIds || [];
+      if(el.checked){
+        if(!coach.groupIds.includes(groupId)) coach.groupIds.push(groupId);
+      }else{
+        coach.groupIds = coach.groupIds.filter(g=>g!==groupId);
+      }
+      await saveState();
+      showToast('Assignation mise à jour.');
+      render();
+    });
   });
 
   // --- GROUPES ---
