@@ -300,8 +300,8 @@ const PERF_CATEGORIES = [
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -1050,7 +1050,7 @@ function viewBulletins(){
 
   return `
     <h2 class="section-title">Bulletin mensuel</h2>
-    <p class="section-sub">Génère un résumé de présence et de progression à envoyer aux parents.</p>
+    <p class="section-sub">Génère un bulletin détaillé (assiduité séance par séance, évaluations du coach par catégorie, objectifs) à envoyer aux parents.</p>
     <div class="card">
       <div class="form-grid">
         <div class="field"><label>Élève</label>
@@ -1063,6 +1063,10 @@ function viewBulletins(){
         <div class="field"><label>Mois</label>
           <input type="month" id="input-bulletin-month" value="${ui.bulletinMonth}">
         </div>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label>Appréciation et commentaire (optionnel)</label>
+        <textarea id="input-bulletin-appreciation" rows="3" placeholder="Appréciation générale du coach sur le mois écoulé, encouragements, axes de travail..."></textarea>
       </div>
       <button class="btn" id="btn-generate-bulletin" ${!student?'disabled':''}>Générer le bulletin</button>
     </div>
@@ -1078,28 +1082,27 @@ function viewBulletins(){
   `;
 }
 
-function generateBulletinText(student, monthStr){
+function generateBulletinText(student, monthStr, appreciation){
   const group = groupById(student.groupId);
   const [year, month] = monthStr.split('-').map(Number);
   const sessions = sessionsOfGroup(student.groupId).filter(s=>{
     const [y,m] = s.date.split('-').map(Number);
     return y===year && m===month;
-  });
+  }).sort((a,b)=>a.date.localeCompare(b.date));
   const total = sessions.length;
   let present = 0;
   sessions.forEach(s=>{ if(s.presences && s.presences[student.id]===true) present++; });
   const pct = total>0 ? Math.round((present/total)*100) : null;
 
   const perfEntries = state.performance.filter(p=>{
+    if(!p.scores) return false;
     const [y,m] = p.date.split('-').map(Number);
     return p.studentId===student.id && y===year && m===month;
   }).sort((a,b)=>a.date.localeCompare(b.date));
 
-  const notesAvg = (()=>{
-    const vals = perfEntries.filter(p=>p.note!=='' && p.note!==null && p.note!==undefined).map(p=>Number(p.note));
-    if(vals.length===0) return null;
-    return (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);
-  })();
+  const objectifs = state.objectifs.filter(o=>o.studentId===student.id)
+    .sort((a,b)=>(b.dateCreation||'').localeCompare(a.dateCreation||''));
+  const statutLabel = {en_cours:'En cours', atteint:'Atteint', abandonne:'Abandonné'};
 
   const monthLabel = new Date(year, month-1, 1).toLocaleDateString('fr-FR',{month:'long', year:'numeric'});
 
@@ -1107,23 +1110,50 @@ function generateBulletinText(student, monthStr){
   txt += `Bulletin mensuel — Golf du Cognac\n`;
   txt += `${student.prenom} ${student.nom} — Groupe : ${group ? group.nom : '—'}\n`;
   txt += `Période : ${monthLabel}\n`;
-  txt += `\n--- Assiduité ---\n`;
+
+  txt += `\n=== Assiduité ===\n`;
   if(total===0){
     txt += `Aucune séance enregistrée ce mois-ci pour ce groupe.\n`;
   }else{
     txt += `Séances prévues : ${total}\n`;
-    txt += `Présences : ${present}/${total} (${pct}%)\n`;
-  }
-  txt += `\n--- Suivi technique du coach ---\n`;
-  if(perfEntries.length===0){
-    txt += `Aucune note de progression enregistrée ce mois-ci.\n`;
-  }else{
-    if(notesAvg) txt += `Note moyenne du mois : ${notesAvg}/10\n\n`;
-    perfEntries.forEach(p=>{
-      txt += `${fmtDate(p.date)}${p.coach?` (${p.coach})`:''}${p.note!==''&&p.note!==null&&p.note!==undefined?` — ${p.note}/10`:''}\n`;
-      if(p.commentaire) txt += `  ${p.commentaire}\n`;
+    txt += `Présences : ${present}/${total} (${pct}%)\n\n`;
+    txt += `Détail des séances :\n`;
+    sessions.forEach(s=>{
+      const p = s.presences ? s.presences[student.id] : undefined;
+      const coach = s.coachId ? coachById(s.coachId) : null;
+      txt += `- ${fmtDate(s.date)} : ${p===true?'Présent':p===false?'Absent':'Non renseigné'}${coach?` (coach : ${coach.prenom} ${coach.nom})`:''}\n`;
     });
   }
+
+  txt += `\n=== Suivi technique du coach ===\n`;
+  if(perfEntries.length===0){
+    txt += `Aucune évaluation enregistrée ce mois-ci.\n`;
+  }else{
+    perfEntries.forEach(p=>{
+      txt += `\n${fmtDate(p.date)}${p.coach?` — ${p.coach}`:''}\n`;
+      PERF_CATEGORIES.forEach(c=>{
+        const v = p.scores[c.key];
+        if(v!==undefined && v!==null && v!=='') txt += `  ${c.label} : ${v}/10\n`;
+      });
+      if(p.commentaire) txt += `  Commentaire : ${p.commentaire}\n`;
+    });
+  }
+
+  txt += `\n=== Objectifs individuels ===\n`;
+  if(objectifs.length===0){
+    txt += `Aucun objectif défini.\n`;
+  }else{
+    objectifs.forEach(o=>{
+      txt += `- ${o.titre} [${statutLabel[o.statut]||o.statut}]${o.dateCible?` — échéance ${fmtDate(o.dateCible)}`:''}\n`;
+      if(o.description) txt += `  ${o.description}\n`;
+    });
+  }
+
+  if(appreciation && appreciation.trim()){
+    txt += `\n=== Appréciation et commentaire ===\n`;
+    txt += `${appreciation.trim()}\n`;
+  }
+
   txt += `\nSportivement,\nL'équipe du Golf du Cognac`;
   return txt;
 }
@@ -1410,21 +1440,27 @@ function bindEvents(){
       if(!student) return;
       const monthVal = document.getElementById('input-bulletin-month').value || ui.bulletinMonth;
       ui.bulletinMonth = monthVal;
-      const txt = generateBulletinText(student, monthVal);
+      const appreciation = document.getElementById('input-bulletin-appreciation').value;
+      const txt = generateBulletinText(student, monthVal, appreciation);
       document.getElementById('bulletin-output-wrap').style.display = 'block';
       document.getElementById('bulletin-text').value = txt;
       const mailLink = document.getElementById('btn-mailto-bulletin');
       const warn = document.getElementById('bulletin-email-warning');
+      let warnMsg = '';
       if(student.parentEmail){
         const subject = encodeURIComponent(`Bulletin mensuel — ${student.prenom} ${student.nom}`);
         const body = encodeURIComponent(txt);
         mailLink.href = `mailto:${student.parentEmail}?subject=${subject}&body=${body}`;
-        warn.textContent = `Sera envoyé à : ${student.parentEmail}`;
+        warnMsg = `Sera envoyé à : ${student.parentEmail}`;
       }else{
         mailLink.href = '#';
         mailLink.addEventListener('click', ev=>ev.preventDefault(), {once:true});
-        warn.textContent = "Aucun e-mail parent renseigné pour cet élève — ajoutez-le dans l'onglet Groupes & élèves.";
+        warnMsg = "Aucun e-mail parent renseigné pour cet élève — ajoutez-le dans l'onglet Élèves.";
       }
+      if(txt.length > 1500){
+        warnMsg += ` ⚠️ Bulletin détaillé (${txt.length} caractères) : si le bouton e-mail n'ouvre rien dans votre messagerie, utilisez « Copier le texte » et collez-le manuellement dans votre message.`;
+      }
+      warn.textContent = warnMsg;
     });
   }
   const btnCopy = document.getElementById('btn-copy-bulletin');
