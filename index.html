@@ -524,8 +524,8 @@ const PRIORITES_SUGGESTION = [
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -1156,6 +1156,7 @@ function viewEleves(){
     (s.parentEmail||'').toLowerCase().includes(search)
   );
   list.sort((a,b)=> (a.nom+a.prenom).localeCompare(b.nom+b.prenom));
+  const saisonLabelDash = (saisonById(state.saisonActiveId)?.label || defaultSaisonLabel()).replace('/','-');
 
   return `
     <h2 class="section-title">Gestion des élèves</h2>
@@ -1174,7 +1175,20 @@ function viewEleves(){
           <div class="field"><label>Niveau (évaluation)</label>
             <select name="niveau">${NIVEAUX.map(n=>`<option value="${n.key}" ${n.key==='debutant'?'selected':''}>${n.label}</option>`).join('')}</select>
           </div>
+          <div class="field"><label>Numéro de licence</label><input name="numeroLicence" type="text" placeholder="Ex : 1234567"></div>
           <div class="field"><label>E-mail parent (optionnel)</label><input name="email" type="email" placeholder="parent@exemple.fr"></div>
+        </div>
+        <div class="field" style="grid-column:1 / -1;margin-bottom:10px;">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;">
+            <input type="checkbox" name="attestationCharte">
+            <span>Attestation Charte et Autorisations EDG ${esc(saisonLabelDash)}</span>
+          </label>
+        </div>
+        <div class="field" style="grid-column:1 / -1;margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:400;">
+            <input type="checkbox" name="attestationAccident">
+            <span>Attestation Autorisation Parentale : Accident</span>
+          </label>
         </div>
         <button class="btn" type="submit">Ajouter l'élève</button>
       </form>
@@ -1194,12 +1208,12 @@ function viewEleves(){
       </div>
 
       ${ list.length===0 ? `<div class="empty">Aucun élève ne correspond.</div>` :
-        `<table><thead><tr><th>Prénom</th><th>Nom</th><th>Naissance</th><th>Groupe</th><th>Niveau</th><th>E-mail parent</th><th></th></tr></thead><tbody>
+        `<table><thead><tr><th>Prénom</th><th>Nom</th><th>Naissance</th><th>Groupe</th><th>Niveau</th><th>Licence</th><th>E-mail parent</th><th>Charte EDG</th><th>Autor. accident</th><th></th></tr></thead><tbody>
           ${list.map(s=>{
             if(ui.editingStudentId === s.id){
               return `
                 <tr>
-                  <td colspan="7">
+                  <td colspan="10">
                     <form id="form-edit-student" data-student-id="${s.id}">
                       <div class="form-grid">
                         <div class="field"><label>Prénom</label><input name="prenom" value="${esc(s.prenom)}" required></div>
@@ -1211,7 +1225,20 @@ function viewEleves(){
                         <div class="field"><label>Niveau (évaluation)</label>
                           <select name="niveau">${NIVEAUX.map(n=>`<option value="${n.key}" ${(s.niveau||'debutant')===n.key?'selected':''}>${n.label}</option>`).join('')}</select>
                         </div>
+                        <div class="field"><label>Numéro de licence</label><input name="numeroLicence" type="text" value="${esc(s.numeroLicence)||''}" placeholder="Ex : 1234567"></div>
                         <div class="field"><label>E-mail parent</label><input name="email" type="email" value="${esc(s.parentEmail)}"></div>
+                      </div>
+                      <div class="field" style="margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;gap:8px;font-weight:400;">
+                          <input type="checkbox" name="attestationCharte" ${s.attestationCharte?'checked':''}>
+                          <span>Attestation Charte et Autorisations EDG ${esc(saisonLabelDash)}</span>
+                        </label>
+                      </div>
+                      <div class="field" style="margin-bottom:12px;">
+                        <label style="display:flex;align-items:center;gap:8px;font-weight:400;">
+                          <input type="checkbox" name="attestationAccident" ${s.attestationAccident?'checked':''}>
+                          <span>Attestation Autorisation Parentale : Accident</span>
+                        </label>
                       </div>
                       <div class="inline-actions">
                         <button class="btn small" type="submit">Enregistrer</button>
@@ -1228,7 +1255,10 @@ function viewEleves(){
                 <td>${s.dateNaissance ? fmtDate(s.dateNaissance) : '<span class="helper">—</span>'}</td>
                 <td>${esc(groupById(s.groupId)?.nom || '—')}</td>
                 <td><span class="pill ok">${esc(niveauLabel(s.niveau||'debutant'))}</span></td>
+                <td>${esc(s.numeroLicence)||'<span class="helper">—</span>'}</td>
                 <td>${esc(s.parentEmail)||'<span class="helper">non renseigné</span>'}</td>
+                <td>${s.attestationCharte ? `<span class="pill ok">✓</span>` : `<span class="pill bad">—</span>`}</td>
+                <td>${s.attestationAccident ? `<span class="pill ok">✓</span>` : `<span class="pill bad">—</span>`}</td>
                 <td>
                   <div class="inline-actions">
                     <button class="btn secondary small" data-edit-student="${s.id}">Modifier</button>
@@ -2311,7 +2341,10 @@ function bindEvents(){
         id:uid(), prenom:fd.get('prenom').trim(), nom:fd.get('nom').trim(),
         dateNaissance: fd.get('dateNaissance') || null,
         parentEmail:(fd.get('email')||'').trim(), groupId:fd.get('groupId'),
-        niveau: fd.get('niveau') || 'debutant'
+        niveau: fd.get('niveau') || 'debutant',
+        numeroLicence: (fd.get('numeroLicence')||'').trim(),
+        attestationCharte: fd.get('attestationCharte') === 'on',
+        attestationAccident: fd.get('attestationAccident') === 'on'
       };
       if(!s.prenom || !s.nom || !s.groupId) return;
       state.students.push(s);
@@ -2346,7 +2379,10 @@ function bindEvents(){
       s.dateNaissance = fd.get('dateNaissance') || null;
       s.groupId = fd.get('groupId');
       s.niveau = fd.get('niveau') || 'debutant';
+      s.numeroLicence = (fd.get('numeroLicence')||'').trim();
       s.parentEmail = (fd.get('email')||'').trim();
+      s.attestationCharte = fd.get('attestationCharte') === 'on';
+      s.attestationAccident = fd.get('attestationAccident') === 'on';
       ui.editingStudentId = null;
       await saveState();
       showToast('Élève modifié.');
