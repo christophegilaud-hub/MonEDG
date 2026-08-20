@@ -288,7 +288,7 @@ const DEFAULT_LOGO_SVG = `<svg class="flagmark" viewBox="0 0 24 24" fill="none">
   <path d="M5 3 L18 6 L5 10 Z" fill="var(--sand)"/>
   <circle cx="5" cy="22" r="1.6" fill="#F1E4B8"/>
 </svg>`;
-let state = { groups: [], students: [], sessions: [], performance: [], objectifs: [], coaches: [], suggestions: [], settings: { logoDataUrl: null, colors: { ...DEFAULT_COLORS } } };
+let state = { groups: [], students: [], sessions: [], performance: [], objectifs: [], coaches: [], suggestions: [], saisons: [], saisonActiveId: null, stages: [], settings: { logoDataUrl: null, colors: { ...DEFAULT_COLORS } } };
 let ui = {
   tab: 'dashboard',
   selGroupManage: null,
@@ -301,6 +301,9 @@ let ui = {
   dashPeriodStart: null,
   dashPeriodEnd: null,
   suggestionsFilterStatut: 'all',
+  groupesSubTab: 'groupes',
+  selGroupSaison: null,
+  openStageId: null,
   bulletinStudent: null,
   bulletinMonth: monthISO(new Date()),
   elevesFilterGroup: 'all',
@@ -515,8 +518,8 @@ const PRIORITES_SUGGESTION = [
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -549,6 +552,8 @@ async function loadState(){
       state.objectifs = state.objectifs || [];
       state.coaches = state.coaches || [];
       state.suggestions = state.suggestions || [];
+      state.saisons = state.saisons || [];
+      state.stages = state.stages || [];
       state.settings = state.settings || {};
       state.settings.colors = state.settings.colors || { ...DEFAULT_COLORS };
       if(state.settings.logoDataUrl === undefined) state.settings.logoDataUrl = null;
@@ -584,6 +589,7 @@ async function showAppScreen(){
   document.getElementById('main-app').style.display = 'block';
   document.getElementById('app').innerHTML = `<div class="empty">Chargement des données…</div>`;
   await loadState();
+  if(ensureDefaultSaison()) await saveState();
   applyTheme();
   render();
 }
@@ -661,6 +667,37 @@ function coachesOfGroup(groupId){
   return state.coaches.filter(c=>(c.groupIds||[]).includes(groupId));
 }
 function coachById(id){ return state.coaches.find(c=>c.id===id); }
+function saisonById(id){ return state.saisons.find(s=>s.id===id); }
+function defaultSaisonLabel(){
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth()+1;
+  return m>=9 ? `${y}/${y+1}` : `${y-1}/${y}`;
+}
+function nextSaisonLabel(label){
+  const parts = (label||'').split('/').map(Number);
+  if(parts.length!==2 || isNaN(parts[0]) || isNaN(parts[1])) return defaultSaisonLabel();
+  return `${parts[0]+1}/${parts[1]+1}`;
+}
+function computeNextSaisonLabel(){
+  if(state.saisons.length===0) return defaultSaisonLabel();
+  const max = state.saisons.slice().sort((a,b)=>a.label.localeCompare(b.label)).pop();
+  return nextSaisonLabel(max.label);
+}
+function ensureDefaultSaison(){
+  let changed = false;
+  if(state.saisons.length===0){
+    const s = {id:uid(), label: defaultSaisonLabel()};
+    state.saisons.push(s);
+    state.saisonActiveId = s.id;
+    changed = true;
+  }
+  if(!state.saisonActiveId || !saisonById(state.saisonActiveId)){
+    state.saisonActiveId = state.saisons[0].id;
+    changed = true;
+  }
+  return changed;
+}
 function groupById(id){ return state.groups.find(g=>g.id===id); }
 function studentById(id){ return state.students.find(s=>s.id===id); }
 function sessionsOfGroup(groupId){
@@ -828,14 +865,40 @@ function viewDashboard(){
    VUE : GROUPES & ÉLÈVES
 --------------------------------------------------------- */
 function viewGroupes(){
-  const sel = ui.selGroupManage && groupById(ui.selGroupManage) ? ui.selGroupManage : (state.groups[0]?.id || null);
-  ui.selGroupManage = sel;
   return `
     <h2 class="section-title">Groupes</h2>
-    <p class="section-sub">Créez vos groupes de cours. La gestion des élèves se fait dans l'onglet « Élèves ».</p>
+    <p class="section-sub">Créez vos groupes de cours et organisez vos stages. La gestion des élèves se fait dans l'onglet « Élèves ».</p>
+    <div class="inline-actions" style="margin-bottom:16px;">
+      <button class="btn ${ui.groupesSubTab==='groupes'?'':'secondary'} small" data-groupes-subtab="groupes">Groupes</button>
+      <button class="btn ${ui.groupesSubTab==='stages'?'':'secondary'} small" data-groupes-subtab="stages">Stages</button>
+    </div>
+    ${ ui.groupesSubTab==='stages' ? viewStages() : viewGroupesListe() }
+  `;
+}
+
+function viewGroupesListe(){
+  const selSaisonId = ui.selGroupSaison || state.saisonActiveId;
+  const sel = ui.selGroupManage && groupById(ui.selGroupManage) ? ui.selGroupManage : (state.groups[0]?.id || null);
+  ui.selGroupManage = sel;
+  const filteredGroups = state.groups.filter(g=>(g.saisonId||state.saisonActiveId)===selSaisonId);
+  const saisonLabel = saisonById(selSaisonId)?.label || '—';
+
+  return `
+    <div class="card">
+      <div class="form-grid" style="margin-bottom:0;">
+        <div class="field">
+          <label>Saison affichée</label>
+          <select id="select-groupes-saison">
+            ${state.saisons.map(s=>`<option value="${s.id}" ${s.id===selSaisonId?'selected':''}>${esc(s.label)}${s.id===state.saisonActiveId?' (active)':''}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <p class="helper" style="margin-top:10px;">Les nouveaux groupes créés sont rattachés à cette saison. Gérez la liste complète des saisons dans l'onglet « Paramétrage ».</p>
+      ${ filteredGroups.length>0 ? `<button class="btn secondary small" id="btn-duplicate-saison-groups">Dupliquer ces groupes vers la saison suivante</button>` : '' }
+    </div>
 
     <div class="card">
-      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Nouveau groupe</h3>
+      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Nouveau groupe — saison ${esc(saisonLabel)}</h3>
       <form id="form-add-group">
         <div class="form-grid">
           <div class="field"><label>Nom du groupe</label><input name="nom" placeholder="Ex : Poussins débutants" required></div>
@@ -849,9 +912,9 @@ function viewGroupes(){
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Groupes existants</h3>
-      ${state.groups.length===0 ? `<div class="empty">Aucun groupe créé pour l'instant.</div>` :
-        state.groups.map(g=>`
+      <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Groupes — saison ${esc(saisonLabel)}</h3>
+      ${filteredGroups.length===0 ? `<div class="empty">Aucun groupe pour cette saison.</div>` :
+        filteredGroups.map(g=>`
           <div class="group-card ${g.id===sel?'active':''}" data-select-group="${g.id}">
             <div>
               <div class="name">${esc(g.nom)}</div>
@@ -864,6 +927,94 @@ function viewGroupes(){
           </div>
         `).join('')
       }
+    </div>
+  `;
+}
+
+/* ---------------------------------------------------------
+   VUE : STAGES
+--------------------------------------------------------- */
+function viewStages(){
+  const selSaisonId = ui.selGroupSaison || state.saisonActiveId;
+  const saisonLabel = saisonById(selSaisonId)?.label || '—';
+  const stages = state.stages.filter(st=>(st.saisonId||state.saisonActiveId)===selSaisonId).sort((a,b)=>(b.dateDebut||'').localeCompare(a.dateDebut||''));
+
+  return `
+    <div class="card">
+      <h3 class="perf-h">Nouveau stage — saison ${esc(saisonLabel)}</h3>
+      <form id="form-add-stage">
+        <div class="form-grid">
+          <div class="field"><label>Nom du stage</label><input type="text" name="nom" placeholder="Ex : Stage de printemps" required></div>
+          <div class="field"><label>Date de début</label><input type="date" name="dateDebut" required></div>
+          <div class="field"><label>Date de fin</label><input type="date" name="dateFin" required></div>
+        </div>
+        <div class="field" style="margin-bottom:12px;"><label>Objectifs du stage</label><textarea name="objectifs" rows="2" placeholder="Ex : Travail du petit jeu et mise en situation de parcours"></textarea></div>
+        <button class="btn" type="submit">Créer le stage</button>
+      </form>
+    </div>
+
+    ${ stages.length===0 ? `<div class="card"><div class="empty">Aucun stage pour cette saison.</div></div>` :
+      stages.map(st=>viewStageCard(st)).join('')
+    }
+  `;
+}
+
+function viewStageCard(st){
+  const opened = ui.openStageId === st.id;
+  const participants = (st.participantIds||[]).map(id=>studentById(id)).filter(Boolean);
+  return `
+    <div class="card">
+      <div class="row-between">
+        <div>
+          <div class="name" style="font-weight:700;color:var(--green-900);">${esc(st.nom)}</div>
+          <div class="meta helper">${fmtDate(st.dateDebut)} → ${fmtDate(st.dateFin)} · ${participants.length} participant(s)</div>
+        </div>
+        <div class="inline-actions">
+          <button class="btn secondary small" data-toggle-stage="${st.id}">${opened?'Fermer':'Gérer'}</button>
+          <button class="btn danger small" data-delete-stage="${st.id}">Supprimer</button>
+        </div>
+      </div>
+      ${ st.objectifs ? `<p class="helper" style="margin-top:8px;">${esc(st.objectifs)}</p>` : '' }
+      ${ opened ? `
+        <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:14px;">
+          <h4 class="eval-section-title" style="margin-bottom:8px;">Participants</h4>
+          ${ state.students.length===0 ? `<div class="empty">Aucun élève créé pour l'instant.</div>` : `
+          <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:16px;">
+            ${state.students.slice().sort((a,b)=>(a.nom+a.prenom).localeCompare(b.nom+b.prenom)).map(s=>`
+              <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:6px;font-size:.88rem;">
+                <input type="checkbox" data-stage-participant="${st.id}|${s.id}" ${(st.participantIds||[]).includes(s.id)?'checked':''}>
+                <span>${esc(s.prenom)} ${esc(s.nom)} <span class="helper">(${esc(groupById(s.groupId)?.nom||'sans groupe')})</span></span>
+              </label>
+            `).join('')}
+          </div>`}
+
+          ${ participants.length===0 ? `<div class="empty">Sélectionnez des participants ci-dessus pour suivre leurs résultats.</div>` :
+            `<h4 class="eval-section-title" style="margin-bottom:8px;">Résultats individuels</h4>` +
+            participants.map(p=>{
+              const evalsInStage = state.performance.filter(pf=>pf.studentId===p.id && pf.sections && pf.date>=st.dateDebut && pf.date<=st.dateFin).sort((a,b)=>a.date.localeCompare(b.date));
+              const commentaire = (st.commentaires && st.commentaires[p.id]) || '';
+              return `
+                <div class="eval-history-card">
+                  <div class="row-between">
+                    <strong>${esc(p.prenom)} ${esc(p.nom)}</strong>
+                    <button class="btn secondary small" data-goto-eval-student="${p.id}">Ajouter une évaluation</button>
+                  </div>
+                  ${ evalsInStage.length===0 ? `<p class="helper" style="margin-top:6px;">Aucune évaluation enregistrée sur la période du stage.</p>` :
+                    `<div class="helper" style="margin-top:6px;">${evalsInStage.map(e=>{
+                      const avg = globalAverage(e.sections, e.niveau);
+                      return `${fmtDate(e.date)} : ${avg!==null?avg.toFixed(1)+'/4':'—'}`;
+                    }).join(' · ')}</div>`
+                  }
+                  <div class="field" style="margin-top:8px;margin-bottom:0;">
+                    <label>Commentaire de stage</label>
+                    <textarea rows="2" data-stage-comment="${st.id}|${p.id}" placeholder="Ressenti, progrès observés pendant le stage...">${esc(commentaire)}</textarea>
+                  </div>
+                </div>
+              `;
+            }).join('')
+          }
+        </div>
+      ` : '' }
     </div>
   `;
 }
@@ -1653,9 +1804,29 @@ function viewSuggestions(){
 function viewParametres(){
   const colors = (state.settings && state.settings.colors) || DEFAULT_COLORS;
   const logo = state.settings && state.settings.logoDataUrl;
+  const saisonsSorted = state.saisons.slice().sort((a,b)=>a.label.localeCompare(b.label));
   return `
     <h2 class="section-title">Paramétrage</h2>
-    <p class="section-sub">Personnalisez l'identité visuelle de votre club : logo et couleurs du site.</p>
+    <p class="section-sub">Personnalisez l'identité visuelle de votre club, gérez vos saisons, logo et couleurs du site.</p>
+
+    <div class="card">
+      <h3 class="perf-h">Gestion des saisons</h3>
+      <p class="helper" style="margin-bottom:14px;">La saison active détermine le contexte par défaut de l'application. Vous pouvez toujours consulter une autre saison depuis l'onglet Groupes.</p>
+      ${ saisonsSorted.length===0 ? `<div class="empty">Aucune saison créée.</div>` :
+        saisonsSorted.map(s=>`
+          <div class="row-between" style="border-bottom:1px solid var(--line);padding:10px 0;">
+            <div>
+              <strong>${esc(s.label)}</strong> ${s.id===state.saisonActiveId?`<span class="pill ok" style="margin-left:8px;">Active</span>`:''}
+            </div>
+            <div class="inline-actions">
+              ${s.id!==state.saisonActiveId?`<button class="btn secondary small" data-set-active-saison="${s.id}">Définir comme active</button>`:''}
+              <button class="btn danger small" data-delete-saison="${s.id}">Supprimer</button>
+            </div>
+          </div>
+        `).join('')
+      }
+      <button class="btn secondary small" id="btn-add-next-saison" style="margin-top:14px;">+ Ajouter la saison suivante (${esc(computeNextSaisonLabel())})</button>
+    </div>
 
     <div class="card">
       <h3 class="perf-h">Logo du club</h3>
@@ -1758,6 +1929,44 @@ function bindEvents(){
   });
 
   // --- PARAMÉTRAGE ---
+  const btnAddNextSaison = document.getElementById('btn-add-next-saison');
+  if(btnAddNextSaison){
+    btnAddNextSaison.addEventListener('click', async ()=>{
+      const label = computeNextSaisonLabel();
+      if(state.saisons.some(s=>s.label===label)){ showToast('Cette saison existe déjà.'); return; }
+      state.saisons.push({id:uid(), label});
+      await saveState();
+      showToast(`Saison ${label} ajoutée.`);
+      render();
+    });
+  }
+  app.querySelectorAll('[data-set-active-saison]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      state.saisonActiveId = el.dataset.setActiveSaison;
+      await saveState();
+      showToast('Saison active mise à jour.');
+      render();
+    });
+  });
+  app.querySelectorAll('[data-delete-saison]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      const id = el.dataset.deleteSaison;
+      const nbGroupes = state.groups.filter(g=>g.saisonId===id).length;
+      const msg = nbGroupes>0
+        ? `Cette saison contient ${nbGroupes} groupe(s). Les supprimer aussi et supprimer la saison ?`
+        : 'Supprimer cette saison ?';
+      if(!confirm(msg)) return;
+      state.groups = state.groups.filter(g=>g.saisonId!==id);
+      state.stages = state.stages.filter(st=>st.saisonId!==id);
+      state.saisons = state.saisons.filter(s=>s.id!==id);
+      if(state.saisonActiveId===id) state.saisonActiveId = state.saisons[0]?.id || null;
+      if(ui.selGroupSaison===id) ui.selGroupSaison = null;
+      ensureDefaultSaison();
+      await saveState();
+      showToast('Saison supprimée.');
+      render();
+    });
+  });
   const inputLogo = document.getElementById('input-logo-upload');
   if(inputLogo){
     inputLogo.addEventListener('change', ()=>{
@@ -1857,13 +2066,39 @@ function bindEvents(){
     });
   });
 
-  // --- GROUPES ---
+  // --- GROUPES & SAISONS ---
+  app.querySelectorAll('[data-groupes-subtab]').forEach(el=>{
+    el.addEventListener('click', ()=>{ ui.groupesSubTab = el.dataset.groupesSubtab; render(); });
+  });
+  const selGroupesSaison = document.getElementById('select-groupes-saison');
+  if(selGroupesSaison) selGroupesSaison.addEventListener('change', ()=>{ ui.selGroupSaison = selGroupesSaison.value; render(); });
+  const btnDuplicateSaisonGroups = document.getElementById('btn-duplicate-saison-groups');
+  if(btnDuplicateSaisonGroups){
+    btnDuplicateSaisonGroups.addEventListener('click', async ()=>{
+      const fromSaisonId = ui.selGroupSaison || state.saisonActiveId;
+      const fromGroups = state.groups.filter(g=>(g.saisonId||state.saisonActiveId)===fromSaisonId);
+      if(fromGroups.length===0) return;
+      const nextLabel = nextSaisonLabel(saisonById(fromSaisonId)?.label || defaultSaisonLabel());
+      let target = state.saisons.find(s=>s.label===nextLabel);
+      if(!target){
+        target = {id:uid(), label: nextLabel};
+        state.saisons.push(target);
+      }
+      fromGroups.forEach(g=>{
+        state.groups.push({id:uid(), nom:g.nom, jour:g.jour, heure:g.heure, saisonId: target.id});
+      });
+      ui.selGroupSaison = target.id;
+      await saveState();
+      showToast(`${fromGroups.length} groupe(s) dupliqué(s) vers ${target.label}.`);
+      render();
+    });
+  }
   const formAddGroup = document.getElementById('form-add-group');
   if(formAddGroup){
     formAddGroup.addEventListener('submit', async e=>{
       e.preventDefault();
       const fd = new FormData(formAddGroup);
-      const g = {id:uid(), nom:fd.get('nom').trim(), jour:fd.get('jour'), heure:fd.get('heure')};
+      const g = {id:uid(), nom:fd.get('nom').trim(), jour:fd.get('jour'), heure:fd.get('heure'), saisonId: ui.selGroupSaison || state.saisonActiveId};
       if(!g.nom) return;
       state.groups.push(g);
       ui.selGroupManage = g.id;
@@ -1897,6 +2132,81 @@ function bindEvents(){
       render();
     });
   });
+
+  // --- STAGES ---
+  const formAddStage = document.getElementById('form-add-stage');
+  if(formAddStage){
+    formAddStage.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const fd = new FormData(formAddStage);
+      const nom = fd.get('nom').trim();
+      const dateDebut = fd.get('dateDebut');
+      const dateFin = fd.get('dateFin');
+      if(!nom || !dateDebut || !dateFin) return;
+      state.stages.push({
+        id:uid(), nom, dateDebut, dateFin,
+        objectifs:(fd.get('objectifs')||'').trim(),
+        saisonId: ui.selGroupSaison || state.saisonActiveId,
+        participantIds: [], commentaires: {}
+      });
+      await saveState();
+      showToast('Stage créé.');
+      render();
+    });
+  }
+  app.querySelectorAll('[data-toggle-stage]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.dataset.toggleStage;
+      ui.openStageId = ui.openStageId===id ? null : id;
+      render();
+    });
+  });
+  app.querySelectorAll('[data-delete-stage]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      if(!confirm('Supprimer ce stage ?')) return;
+      state.stages = state.stages.filter(st=>st.id!==el.dataset.deleteStage);
+      if(ui.openStageId===el.dataset.deleteStage) ui.openStageId = null;
+      await saveState();
+      showToast('Stage supprimé.');
+      render();
+    });
+  });
+  app.querySelectorAll('[data-stage-participant]').forEach(el=>{
+    el.addEventListener('change', async ()=>{
+      const [stageId, studentId] = el.dataset.stageParticipant.split('|');
+      const st = state.stages.find(x=>x.id===stageId);
+      if(!st) return;
+      st.participantIds = st.participantIds || [];
+      if(el.checked){
+        if(!st.participantIds.includes(studentId)) st.participantIds.push(studentId);
+      }else{
+        st.participantIds = st.participantIds.filter(id=>id!==studentId);
+      }
+      await saveState();
+      render();
+    });
+  });
+  app.querySelectorAll('[data-stage-comment]').forEach(el=>{
+    el.addEventListener('change', async ()=>{
+      const [stageId, studentId] = el.dataset.stageComment.split('|');
+      const st = state.stages.find(x=>x.id===stageId);
+      if(!st) return;
+      st.commentaires = st.commentaires || {};
+      st.commentaires[studentId] = el.value;
+      await saveState();
+      showToast('Commentaire enregistré.');
+    });
+  });
+  app.querySelectorAll('[data-goto-eval-student]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      ui.perfStudent = el.dataset.gotoEvalStudent;
+      ui.tab = 'performance';
+      ui.performanceSubTab = 'fiche';
+      render();
+    });
+  });
+
+
 
   // --- ÉLÈVES (module dédié) ---
   const formAddStudentEleves = document.getElementById('form-add-student-eleves');
