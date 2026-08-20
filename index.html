@@ -306,73 +306,201 @@ let ui = {
 };
 const JOURS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const SCORE_LABELS = {1:'Non acquis', 2:'En cours', 3:'Acquis', 4:'Maîtrisé'};
-const EVAL_SECTIONS = [
-  {
-    key:'grand_jeu', label:'Grand Jeu (Driving & Fers)',
-    objectif:'Capacité à produire une trajectoire longue et rectiligne.',
-    criteria:[
-      {key:'posture_grip', label:'Posture et Grip', desc:'Placement des mains, alignement du corps, équilibre.'},
-      {key:'qualite_contact', label:'Qualité du contact', desc:'Centrage de balle dans la face de club.'},
-      {key:'regularite_distance', label:'Régularité et Distance', desc:'Longueur et dispersion de la trajectoire.'}
-    ]
-  },
-  {
-    key:'petit_jeu', label:'Petit Jeu (Chipping & Sorties de bunker)',
-    objectif:'Approcher la balle au plus près du trou depuis les abords du green.',
-    criteria:[
-      {key:'dosage_chipping', label:'Dosage (Chipping)', desc:"Maîtrise de l'amplitude du swing selon la distance."},
-      {key:'choix_club', label:'Choix du club', desc:'Utilisation pertinente du club selon la situation (Sandwedge, Pitching wedge, Fer 7).'}
-    ]
-  },
-  {
-    key:'putting', label:'Putting',
-    objectif:'Limiter le nombre de coups sur le green (viser le « 2-putts » maximum).',
-    criteria:[
-      {key:'lecture_green', label:'Lecture de Green', desc:'Identification des pentes et du sens de la roule.'},
-      {key:'controle_distance', label:'Contrôle de la distance (Dosage)', desc:'Réduction des erreurs de longueur.'},
-      {key:'direction_visee', label:'Direction (Visée)', desc:'Capacité à lancer la balle sur la ligne choisie.'}
-    ]
-  },
-  {
-    key:'strategie', label:'Stratégie & Gestion du Parcours',
-    objectif:'Faire les bons choix pour optimiser son score.',
-    criteria:[
-      {key:'routine_jeu', label:'Routine de jeu', desc:"Mise en place d'une préparation constante avant chaque coup (coup d'essai, visualisation)."},
-      {key:'securite_risque', label:'Sécurité / Prise de risque', desc:'Évitement intelligent des obstacles (bunkers, hors-limites, eau).'}
-    ]
-  },
-  {
-    key:'attitude', label:'Attitude, Étiquette & Sécurité',
-    objectif:'Respecter le jeu, les autres et le terrain.',
-    criteria:[
-      {key:'securite', label:'Sécurité', desc:'Vigilance absolue avant de swinguer (personne dans la zone de danger).'},
-      {key:'respect_terrain', label:'Respect du terrain', desc:'Relevage des pitchs, remplacement des divots, ratissage des bunkers.'},
-      {key:'gestion_emotions', label:'Gestion des émotions', desc:'Résilience face aux mauvais coups et concentration.'}
-    ]
-  },
-  {
-    key:'etiquette', label:'Étiquette du Golf',
-    objectif:'Respecter les valeurs et les codes du jeu, sur le parcours comme envers les autres.',
-    criteria:[
-      {key:'respect_partenaires', label:'Respect des partenaires', desc:'Courtoisie, silence et respect du jeu des autres joueurs.'},
-      {key:'respect_parcours', label:'Respect du Parcours', desc:'Entretien et préservation du terrain et de ses infrastructures.'},
-      {key:'respect_coach', label:'Respect du Coach', desc:'Écoute et application des consignes données par le coach.'},
-      {key:'securite', label:'Sécurité', desc:'Vigilance constante pour la sécurité de soi et des autres.'},
-      {key:'rythme_jeu', label:'Rythme de jeu', desc:"Maintien d'une cadence de jeu fluide, sans retard excessif."},
-      {key:'greens', label:'Sur les Greens', desc:'Ne pas marcher sur la ligne de putt, réparer les pitchs, gérer le drapeau correctement.'},
-      {key:'bunkers', label:'Dans les Bunkers', desc:'Entrer et sortir du bon côté, ratisser après le passage.'},
-      {key:'fairways', label:'Sur les Fairways', desc:'Replacer les divots, préserver le sol de jeu.'}
-    ]
-  }
+const NIVEAUX = [
+  {key:'debutant', label:'Débutant'},
+  {key:'progression', label:'Progression'},
+  {key:'confirme', label:'Confirmé'},
+  {key:'performance', label:'Performance / Élite'}
 ];
+
+const EVAL_GRIDS = {
+  debutant: [
+    {
+      key:'swing_base', label:'Bases du Swing',
+      objectif:'Acquérir les fondamentaux du geste technique.',
+      criteria:[
+        {key:'grip', label:'Prise en main (Grip)', desc:'Positionnement correct des mains sur le club.'},
+        {key:'posture', label:'Posture de base', desc:'Alignement et équilibre au départ du geste.'},
+        {key:'contact', label:'Contact avec la balle', desc:'Capacité à toucher la balle de façon régulière.'}
+      ]
+    },
+    {
+      key:'securite_comportement', label:'Sécurité & Comportement',
+      objectif:"Adopter les bons réflexes de sécurité et d'écoute.",
+      criteria:[
+        {key:'securite', label:'Sécurité', desc:'Respect des distances et consignes de sécurité sur le practice.'},
+        {key:'ecoute', label:'Écoute du coach', desc:'Attention et application des consignes données.'},
+        {key:'comportement', label:'Comportement général', desc:'Tenue, politesse et respect du matériel.'}
+      ]
+    }
+  ],
+  progression: [
+    {
+      key:'grand_jeu', label:'Grand Jeu (Driving & Fers)',
+      objectif:'Capacité à produire une trajectoire longue et rectiligne.',
+      criteria:[
+        {key:'posture_grip', label:'Posture et Grip', desc:'Placement des mains, alignement du corps, équilibre.'},
+        {key:'qualite_contact', label:'Qualité du contact', desc:'Centrage de balle dans la face de club.'},
+        {key:'regularite_distance', label:'Régularité et Distance', desc:'Longueur et dispersion de la trajectoire.'}
+      ]
+    },
+    {
+      key:'petit_jeu', label:'Petit Jeu (Chipping & Sorties de bunker)',
+      objectif:'Approcher la balle au plus près du trou depuis les abords du green.',
+      criteria:[
+        {key:'dosage_chipping', label:'Dosage (Chipping)', desc:"Maîtrise de l'amplitude du swing selon la distance."},
+        {key:'choix_club', label:'Choix du club', desc:'Utilisation pertinente du club selon la situation.'}
+      ]
+    },
+    {
+      key:'putting', label:'Putting',
+      objectif:'Limiter le nombre de coups sur le green.',
+      criteria:[
+        {key:'lecture_green', label:'Lecture de Green', desc:'Identification des pentes et du sens de la roule.'},
+        {key:'controle_distance', label:'Contrôle de la distance (Dosage)', desc:'Réduction des erreurs de longueur.'}
+      ]
+    },
+    {
+      key:'attitude', label:'Attitude & Sécurité',
+      objectif:'Respecter le jeu, les autres et le terrain.',
+      criteria:[
+        {key:'securite', label:'Sécurité', desc:'Vigilance absolue avant de swinguer.'},
+        {key:'respect_terrain', label:'Respect du terrain', desc:'Relevage des pitchs, remplacement des divots.'},
+        {key:'gestion_emotions', label:'Gestion des émotions', desc:'Résilience face aux mauvais coups et concentration.'}
+      ]
+    }
+  ],
+  confirme: [
+    {
+      key:'grand_jeu', label:'Grand Jeu (Driving & Fers)',
+      objectif:'Capacité à produire une trajectoire longue et rectiligne.',
+      criteria:[
+        {key:'posture_grip', label:'Posture et Grip', desc:'Placement des mains, alignement du corps, équilibre.'},
+        {key:'qualite_contact', label:'Qualité du contact', desc:'Centrage de balle dans la face de club.'},
+        {key:'regularite_distance', label:'Régularité et Distance', desc:'Longueur et dispersion de la trajectoire.'}
+      ]
+    },
+    {
+      key:'petit_jeu', label:'Petit Jeu (Chipping & Sorties de bunker)',
+      objectif:'Approcher la balle au plus près du trou depuis les abords du green.',
+      criteria:[
+        {key:'dosage_chipping', label:'Dosage (Chipping)', desc:"Maîtrise de l'amplitude du swing selon la distance."},
+        {key:'choix_club', label:'Choix du club', desc:'Utilisation pertinente du club selon la situation (Sandwedge, Pitching wedge, Fer 7).'}
+      ]
+    },
+    {
+      key:'putting', label:'Putting',
+      objectif:'Limiter le nombre de coups sur le green (viser le « 2-putts » maximum).',
+      criteria:[
+        {key:'lecture_green', label:'Lecture de Green', desc:'Identification des pentes et du sens de la roule.'},
+        {key:'controle_distance', label:'Contrôle de la distance (Dosage)', desc:'Réduction des erreurs de longueur.'},
+        {key:'direction_visee', label:'Direction (Visée)', desc:'Capacité à lancer la balle sur la ligne choisie.'}
+      ]
+    },
+    {
+      key:'strategie', label:'Stratégie & Gestion du Parcours',
+      objectif:'Faire les bons choix pour optimiser son score.',
+      criteria:[
+        {key:'routine_jeu', label:'Routine de jeu', desc:"Mise en place d'une préparation constante avant chaque coup (coup d'essai, visualisation)."},
+        {key:'securite_risque', label:'Sécurité / Prise de risque', desc:'Évitement intelligent des obstacles (bunkers, hors-limites, eau).'}
+      ]
+    },
+    {
+      key:'attitude', label:'Attitude, Étiquette & Sécurité',
+      objectif:'Respecter le jeu, les autres et le terrain.',
+      criteria:[
+        {key:'securite', label:'Sécurité', desc:'Vigilance absolue avant de swinguer (personne dans la zone de danger).'},
+        {key:'respect_terrain', label:'Respect du terrain', desc:'Relevage des pitchs, remplacement des divots, ratissage des bunkers.'},
+        {key:'gestion_emotions', label:'Gestion des émotions', desc:'Résilience face aux mauvais coups et concentration.'}
+      ]
+    },
+    {
+      key:'etiquette', label:'Étiquette du Golf',
+      objectif:'Respecter les valeurs et les codes du jeu, sur le parcours comme envers les autres.',
+      criteria:[
+        {key:'respect_partenaires', label:'Respect des partenaires', desc:'Courtoisie, silence et respect du jeu des autres joueurs.'},
+        {key:'respect_parcours', label:'Respect du Parcours', desc:'Entretien et préservation du terrain et de ses infrastructures.'},
+        {key:'respect_coach', label:'Respect du Coach', desc:'Écoute et application des consignes données par le coach.'},
+        {key:'securite', label:'Sécurité', desc:'Vigilance constante pour la sécurité de soi et des autres.'},
+        {key:'rythme_jeu', label:'Rythme de jeu', desc:"Maintien d'une cadence de jeu fluide, sans retard excessif."},
+        {key:'greens', label:'Sur les Greens', desc:'Ne pas marcher sur la ligne de putt, réparer les pitchs, gérer le drapeau correctement.'},
+        {key:'bunkers', label:'Dans les Bunkers', desc:'Entrer et sortir du bon côté, ratisser après le passage.'},
+        {key:'fairways', label:'Sur les Fairways', desc:'Replacer les divots, préserver le sol de jeu.'}
+      ]
+    }
+  ],
+  performance: [
+    {
+      key:'grand_jeu_avance', label:'Grand Jeu Avancé',
+      objectif:'Maîtriser la trajectoire et la distance sous pression de compétition.',
+      criteria:[
+        {key:'controle_trajectoire', label:'Contrôle de trajectoire', desc:'Capacité à travailler la balle (draw/fade) volontairement.'},
+        {key:'gestion_distances', label:'Gestion des distances', desc:'Précision des yardages et choix de club en conséquence.'},
+        {key:'repetabilite', label:'Répétabilité sous pression', desc:'Constance du geste en situation de jeu ou de compétition.'}
+      ]
+    },
+    {
+      key:'petit_jeu_avance', label:'Petit Jeu Avancé',
+      objectif:'Diversifier et fiabiliser les trajectoires autour des greens.',
+      criteria:[
+        {key:'variete_trajectoires', label:'Variété des trajectoires', desc:'Chip, pitch, lob : choix et exécution adaptés à la situation.'},
+        {key:'bunker_maitrise', label:'Sorties de bunker maîtrisées', desc:'Régularité et précision depuis les bunkers de green.'}
+      ]
+    },
+    {
+      key:'putting_competition', label:'Putting de Compétition',
+      objectif:'Sécuriser les putts décisifs et gérer les longues distances.',
+      criteria:[
+        {key:'lecture_complexe', label:'Lecture de greens complexes', desc:'Analyse fine des pentes et vitesses de green.'},
+        {key:'putts_pression', label:'Putts de pression (< 2m)', desc:'Fiabilité sur les putts courts décisifs.'},
+        {key:'longs_putts', label:'Gestion des longs putts', desc:'Dosage pour limiter les 3-putts.'}
+      ]
+    },
+    {
+      key:'strategie_parcours', label:'Stratégie de Parcours',
+      objectif:"Optimiser la prise de décision sur l'ensemble du parcours.",
+      criteria:[
+        {key:'plan_jeu', label:'Plan de jeu', desc:"Élaboration et respect d'une stratégie de round."},
+        {key:'decision_pression', label:'Décision sous pression', desc:'Choix pertinents dans les moments clés.'},
+        {key:'analyse_post_parcours', label:'Analyse post-parcours', desc:"Capacité à tirer les enseignements d'un round."}
+      ]
+    },
+    {
+      key:'preparation_mentale_physique', label:'Préparation Mentale & Physique',
+      objectif:'Développer la robustesse mentale et la condition physique du joueur.',
+      criteria:[
+        {key:'gestion_stress', label:'Gestion du stress', desc:'Maîtrise des émotions en situation de compétition.'},
+        {key:'routine_preparation', label:'Routine de préparation', desc:"Constance de l'échauffement et de la mise en condition."},
+        {key:'condition_physique', label:'Condition physique', desc:'Endurance et préparation physique adaptées à la compétition.'}
+      ]
+    },
+    {
+      key:'etiquette_competition', label:'Étiquette & Esprit de Compétition',
+      objectif:'Représenter les valeurs du golf au plus haut niveau.',
+      criteria:[
+        {key:'regles_competition', label:'Respect des règles de compétition', desc:'Connaissance et application stricte du règlement.'},
+        {key:'fair_play', label:'Fair-play', desc:'Intégrité et sportivité en toutes circonstances.'},
+        {key:'rythme_competition', label:'Rythme de jeu en compétition', desc:'Respect du temps de jeu imparti.'}
+      ]
+    }
+  ]
+};
+
+function gridFor(niveau){
+  return EVAL_GRIDS[niveau] || EVAL_GRIDS.confirme;
+}
+function niveauLabel(niveau){
+  const n = NIVEAUX.find(n=>n.key===niveau);
+  return n ? n.label : 'Confirmé';
+}
 
 /* ---------------------------------------------------------
    CONFIGURATION SUPABASE
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -745,8 +873,12 @@ function viewEleves(){
         <div class="form-grid">
           <div class="field"><label>Prénom</label><input name="prenom" required></div>
           <div class="field"><label>Nom</label><input name="nom" required></div>
+          <div class="field"><label>Date de naissance</label><input name="dateNaissance" type="date"></div>
           <div class="field"><label>Groupe</label>
             <select name="groupId">${state.groups.map(g=>`<option value="${g.id}">${esc(g.nom)}</option>`).join('')}</select>
+          </div>
+          <div class="field"><label>Niveau (évaluation)</label>
+            <select name="niveau">${NIVEAUX.map(n=>`<option value="${n.key}" ${n.key==='debutant'?'selected':''}>${n.label}</option>`).join('')}</select>
           </div>
           <div class="field"><label>E-mail parent (optionnel)</label><input name="email" type="email" placeholder="parent@exemple.fr"></div>
         </div>
@@ -768,18 +900,22 @@ function viewEleves(){
       </div>
 
       ${ list.length===0 ? `<div class="empty">Aucun élève ne correspond.</div>` :
-        `<table><thead><tr><th>Prénom</th><th>Nom</th><th>Groupe</th><th>E-mail parent</th><th></th></tr></thead><tbody>
+        `<table><thead><tr><th>Prénom</th><th>Nom</th><th>Naissance</th><th>Groupe</th><th>Niveau</th><th>E-mail parent</th><th></th></tr></thead><tbody>
           ${list.map(s=>{
             if(ui.editingStudentId === s.id){
               return `
                 <tr>
-                  <td colspan="5">
+                  <td colspan="7">
                     <form id="form-edit-student" data-student-id="${s.id}">
                       <div class="form-grid">
                         <div class="field"><label>Prénom</label><input name="prenom" value="${esc(s.prenom)}" required></div>
                         <div class="field"><label>Nom</label><input name="nom" value="${esc(s.nom)}" required></div>
+                        <div class="field"><label>Date de naissance</label><input name="dateNaissance" type="date" value="${esc(s.dateNaissance)||''}"></div>
                         <div class="field"><label>Groupe</label>
                           <select name="groupId">${state.groups.map(g=>`<option value="${g.id}" ${g.id===s.groupId?'selected':''}>${esc(g.nom)}</option>`).join('')}</select>
+                        </div>
+                        <div class="field"><label>Niveau (évaluation)</label>
+                          <select name="niveau">${NIVEAUX.map(n=>`<option value="${n.key}" ${(s.niveau||'debutant')===n.key?'selected':''}>${n.label}</option>`).join('')}</select>
                         </div>
                         <div class="field"><label>E-mail parent</label><input name="email" type="email" value="${esc(s.parentEmail)}"></div>
                       </div>
@@ -795,7 +931,9 @@ function viewEleves(){
               <tr>
                 <td>${esc(s.prenom)}</td>
                 <td>${esc(s.nom)}</td>
+                <td>${s.dateNaissance ? fmtDate(s.dateNaissance) : '<span class="helper">—</span>'}</td>
                 <td>${esc(groupById(s.groupId)?.nom || '—')}</td>
+                <td><span class="pill ok">${esc(niveauLabel(s.niveau||'debutant'))}</span></td>
                 <td>${esc(s.parentEmail)||'<span class="helper">non renseigné</span>'}</td>
                 <td>
                   <div class="inline-actions">
@@ -927,16 +1065,18 @@ function viewAlertes(){
 /* ---------------------------------------------------------
    VUE : PERFORMANCE
 --------------------------------------------------------- */
-function sectionAverage(sections, sectionKey){
-  const section = EVAL_SECTIONS.find(s=>s.key===sectionKey);
+function sectionAverage(sections, sectionKey, niveau){
+  const grid = gridFor(niveau);
+  const section = grid.find(s=>s.key===sectionKey);
   if(!section || !sections || !sections[sectionKey]) return null;
   const vals = section.criteria.map(c=>sections[sectionKey][c.key]).filter(v=>v!==undefined && v!==null && v!=='');
   if(vals.length===0) return null;
   return vals.reduce((a,b)=>a+Number(b),0)/vals.length;
 }
-function globalAverage(sections){
+function globalAverage(sections, niveau){
   if(!sections) return null;
-  const avgs = EVAL_SECTIONS.map(s=>sectionAverage(sections,s.key)).filter(v=>v!==null);
+  const grid = gridFor(niveau);
+  const avgs = grid.map(s=>sectionAverage(sections,s.key,niveau)).filter(v=>v!==null);
   if(avgs.length===0) return null;
   return avgs.reduce((a,b)=>a+b,0)/avgs.length;
 }
@@ -960,6 +1100,8 @@ function viewPerfFiche(){
   const studentId = ui.perfStudent && studentById(ui.perfStudent) ? ui.perfStudent : state.students[0].id;
   ui.perfStudent = studentId;
   const student = studentById(studentId);
+  const niveau = student.niveau || 'debutant';
+  const grid = gridFor(niveau);
   const evals = state.performance.filter(p=>p.studentId===studentId && p.sections).sort((a,b)=>b.date.localeCompare(a.date));
   const latest = evals[0] || null;
   const prev = evals[1] || null;
@@ -967,22 +1109,31 @@ function viewPerfFiche(){
 
   return `
     <div class="card">
-      <div class="field" style="max-width:340px;margin-bottom:0;">
-        <label>Élève</label>
-        <select id="select-perf-student">
-          ${state.students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${esc(s.prenom)} ${esc(s.nom)} — ${esc(groupById(s.groupId)?.nom||'')}</option>`).join('')}
-        </select>
+      <div class="form-grid" style="margin-bottom:0;">
+        <div class="field">
+          <label>Élève</label>
+          <select id="select-perf-student">
+            ${state.students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${esc(s.prenom)} ${esc(s.nom)} — ${esc(groupById(s.groupId)?.nom||'')}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label>Niveau d'évaluation</label>
+          <select id="select-perf-niveau" data-student-id="${student.id}">
+            ${NIVEAUX.map(n=>`<option value="${n.key}" ${niveau===n.key?'selected':''}>${n.label}</option>`).join('')}
+          </select>
+        </div>
       </div>
+      <p class="helper" style="margin-top:10px;">Le niveau détermine la grille de critères utilisée pour la prochaine évaluation. Les bilans déjà enregistrés conservent la grille avec laquelle ils ont été notés.</p>
     </div>
 
     <div class="card">
       <h3 class="perf-h">Fiche individuelle — ${esc(student.prenom)} ${esc(student.nom)}</h3>
-      <p class="helper" style="margin-bottom:14px;">${esc(groupById(student.groupId)?.nom || 'Sans groupe')} ${latest?`· dernier bilan le ${fmtDate(latest.date)}`:''}</p>
+      <p class="helper" style="margin-bottom:14px;">${esc(groupById(student.groupId)?.nom || 'Sans groupe')} · Niveau : ${esc(niveauLabel(niveau))} ${student.dateNaissance?`· né(e) le ${fmtDate(student.dateNaissance)}`:''} ${latest?`· dernier bilan le ${fmtDate(latest.date)} (${esc(niveauLabel(latest.niveau))})`:''}</p>
       ${ !latest ? `<div class="empty">Aucune évaluation enregistrée pour l'instant.</div>` :
         `<div class="cat-grid">
-          ${EVAL_SECTIONS.map(section=>{
-            const val = sectionAverage(latest.sections, section.key);
-            const pval = prev ? sectionAverage(prev.sections, section.key) : null;
+          ${gridFor(latest.niveau).map(section=>{
+            const val = sectionAverage(latest.sections, section.key, latest.niveau);
+            const pval = (prev && prev.niveau===latest.niveau) ? sectionAverage(prev.sections, section.key, prev.niveau) : null;
             let delta = '';
             if(val!==null && pval!==null){
               const diff = val-pval;
@@ -999,8 +1150,8 @@ function viewPerfFiche(){
     </div>
 
     <div class="card">
-      <h3 class="perf-h">Nouvelle évaluation</h3>
-      <form id="form-add-eval">
+      <h3 class="perf-h">Nouvelle évaluation — grille « ${esc(niveauLabel(niveau))} »</h3>
+      <form id="form-add-eval" data-eval-niveau="${niveau}">
         <div class="form-grid">
           <div class="field"><label>Date</label><input type="date" name="date" value="${todayISO()}" required></div>
           <div class="field"><label>Coach / Évaluateur</label>
@@ -1014,7 +1165,7 @@ function viewPerfFiche(){
           </div>
         </div>
 
-        ${EVAL_SECTIONS.map(section=>`
+        ${grid.map(section=>`
           <div class="eval-section">
             <h4 class="eval-section-title">${section.label}</h4>
             <p class="helper" style="margin:2px 0 10px;">${esc(section.objectif)}</p>
@@ -1086,6 +1237,7 @@ function viewPerfFiche(){
       <h3 class="perf-h">Historique de progression</h3>
       ${ evals.length===0 ? `<div class="empty">Pas encore d'historique pour cet élève.</div>` :
         evals.map(e=>{
+          const eGrid = gridFor(e.niveau);
           const ind = e.indicateurs || {};
           const indParts = [];
           if(ind.scoreReel) indParts.push(`Score ${esc(ind.scoreReel)} coups${ind.scoreTrous?` sur ${esc(ind.scoreTrous)} trous`:''}`);
@@ -1094,12 +1246,12 @@ function viewPerfFiche(){
           return `
           <div class="eval-history-card">
             <div class="row-between">
-              <div><strong>${fmtDate(e.date)}</strong>${e.coach?` — ${esc(e.coach)}`:''}</div>
+              <div><strong>${fmtDate(e.date)}</strong>${e.coach?` — ${esc(e.coach)}`:''} <span class="pill ok">${esc(niveauLabel(e.niveau))}</span></div>
               <button class="btn danger small" data-delete-eval="${e.id}">Suppr.</button>
             </div>
             <div class="cat-grid" style="margin-top:8px;">
-              ${EVAL_SECTIONS.map(section=>{
-                const val = sectionAverage(e.sections, section.key);
+              ${eGrid.map(section=>{
+                const val = sectionAverage(e.sections, section.key, e.niveau);
                 return `<div class="cat-row">
                   <div class="cat-label">${section.label}</div>
                   <div class="cat-bar-wrap"><div class="cat-bar" style="width:${val!==null?Math.round((val/4)*100):0}%"></div></div>
@@ -1125,51 +1277,69 @@ function viewPerfStats(){
   const totalStudents = state.students.length;
   const evaluated = studentsWithEval.length;
 
-  const sectionAverages = {};
-  EVAL_SECTIONS.forEach(section=>{
-    const vals = studentsWithEval.map(x=>sectionAverage(x.latest.sections, section.key)).filter(v=>v!==null);
-    sectionAverages[section.key] = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
-  });
-  const globalAvgVals = Object.values(sectionAverages).filter(v=>v!==null);
-  const globalAvg = globalAvgVals.length ? (globalAvgVals.reduce((a,b)=>a+b,0)/globalAvgVals.length) : null;
-  const withAvg = EVAL_SECTIONS.filter(s=>sectionAverages[s.key]!==null);
-  const weakest = withAvg.length ? withAvg.slice().sort((a,b)=>sectionAverages[a.key]-sectionAverages[b.key])[0] : null;
-
   const totalObj = state.objectifs.length;
   const atteints = state.objectifs.filter(o=>o.statut==='atteint').length;
 
-  const rankedStudents = studentsWithEval.slice().sort((a,b)=>(globalAverage(a.latest.sections)||0)-(globalAverage(b.latest.sections)||0));
+  // moyenne générale tous niveaux confondus (moyenne de moyennes, comparable car toujours sur /4)
+  const allGlobalAvgs = studentsWithEval.map(x=>globalAverage(x.latest.sections, x.latest.niveau)).filter(v=>v!==null);
+  const overallAvg = allGlobalAvgs.length ? (allGlobalAvgs.reduce((a,b)=>a+b,0)/allGlobalAvgs.length) : null;
+
+  const rankedStudents = studentsWithEval.slice().sort((a,b)=>(globalAverage(a.latest.sections,a.latest.niveau)||0)-(globalAverage(b.latest.sections,b.latest.niveau)||0));
+
+  // regroupement par niveau, car les grilles de critères diffèrent d'un niveau à l'autre
+  const groups = NIVEAUX.map(n=>{
+    const members = studentsWithEval.filter(x=>(x.latest.niveau||'debutant')===n.key);
+    if(members.length===0) return null;
+    const grid = gridFor(n.key);
+    const sectionAverages = {};
+    grid.forEach(section=>{
+      const vals = members.map(x=>sectionAverage(x.latest.sections, section.key, n.key)).filter(v=>v!==null);
+      sectionAverages[section.key] = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+    });
+    const withAvg = grid.filter(s=>sectionAverages[s.key]!==null);
+    const weakest = withAvg.length ? withAvg.slice().sort((a,b)=>sectionAverages[a.key]-sectionAverages[b.key])[0] : null;
+    return { niveau:n, members, grid, sectionAverages, weakest };
+  }).filter(Boolean);
 
   return `
     <div class="stat-row">
       <div class="stat"><div class="num">${evaluated}/${totalStudents}</div><div class="label">Élèves évalués</div></div>
-      <div class="stat"><div class="num">${globalAvg!==null?globalAvg.toFixed(1):'—'}</div><div class="label">Moyenne générale /4</div></div>
+      <div class="stat"><div class="num">${overallAvg!==null?overallAvg.toFixed(1):'—'}</div><div class="label">Moyenne générale /4</div></div>
       <div class="stat"><div class="num">${atteints}/${totalObj}</div><div class="label">Objectifs atteints</div></div>
-      <div class="stat alert"><div class="num" style="font-size:1.05rem;">${weakest?weakest.label:'—'}</div><div class="label">Point collectif à travailler</div></div>
+      <div class="stat"><div class="num">${groups.length}/${NIVEAUX.length}</div><div class="label">Niveaux représentés</div></div>
     </div>
-    <div class="card">
-      <h3 class="perf-h">Moyennes du club par section</h3>
-      ${ evaluated===0 ? `<div class="empty">Aucune évaluation enregistrée pour l'instant.</div>` :
-        `<div class="cat-grid">
-          ${EVAL_SECTIONS.map(section=>`
-            <div class="cat-row">
-              <div class="cat-label">${section.label}</div>
-              <div class="cat-bar-wrap"><div class="cat-bar" style="width:${sectionAverages[section.key]?Math.round((sectionAverages[section.key]/4)*100):0}%"></div></div>
-              <div class="cat-val">${sectionAverages[section.key]!==null?sectionAverages[section.key].toFixed(1)+'/4':'—'}</div>
-            </div>
-          `).join('')}
-        </div>`
-      }
-    </div>
+
+    ${ groups.length===0 ? `<div class="card"><div class="empty">Aucune évaluation enregistrée pour l'instant.</div></div>` :
+      groups.map(g=>`
+        <div class="card">
+          <div class="row-between" style="margin-bottom:4px;">
+            <h3 class="perf-h" style="margin-bottom:0;">Niveau ${esc(g.niveau.label)}</h3>
+            <span class="helper">${g.members.length} élève(s) évalué(s)</span>
+          </div>
+          ${ g.weakest ? `<p class="helper" style="margin-bottom:12px;">Point collectif à travailler : <strong>${esc(g.weakest.label)}</strong></p>` : '' }
+          <div class="cat-grid">
+            ${g.grid.map(section=>`
+              <div class="cat-row">
+                <div class="cat-label">${section.label}</div>
+                <div class="cat-bar-wrap"><div class="cat-bar" style="width:${g.sectionAverages[section.key]?Math.round((g.sectionAverages[section.key]/4)*100):0}%"></div></div>
+                <div class="cat-val">${g.sectionAverages[section.key]!==null?g.sectionAverages[section.key].toFixed(1)+'/4':'—'}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')
+    }
+
     <div class="card">
       <h3 class="perf-h">Détail par élève</h3>
       ${ studentsWithEval.length===0 ? `<div class="empty">Aucune évaluation enregistrée pour l'instant.</div>` :
-        `<table><thead><tr><th>Élève</th><th>Groupe</th><th>Moyenne dernier bilan</th><th>Date</th></tr></thead><tbody>
+        `<table><thead><tr><th>Élève</th><th>Groupe</th><th>Niveau</th><th>Moyenne dernier bilan</th><th>Date</th></tr></thead><tbody>
           ${rankedStudents.map(x=>`
             <tr>
               <td>${esc(x.student.prenom)} ${esc(x.student.nom)}</td>
               <td>${esc(groupById(x.student.groupId)?.nom||'—')}</td>
-              <td>${globalAverage(x.latest.sections).toFixed(1)}/4</td>
+              <td><span class="pill ok">${esc(niveauLabel(x.latest.niveau))}</span></td>
+              <td>${globalAverage(x.latest.sections, x.latest.niveau).toFixed(1)}/4</td>
               <td>${fmtDate(x.latest.date)}</td>
             </tr>
           `).join('')}
@@ -1269,9 +1439,9 @@ function generateBulletinText(student, monthStr, appreciation){
     txt += `Aucune évaluation enregistrée ce mois-ci.\n`;
   }else{
     perfEntries.forEach(p=>{
-      txt += `\n${fmtDate(p.date)}${p.coach?` — ${p.coach}`:''}\n`;
-      EVAL_SECTIONS.forEach(section=>{
-        const avg = sectionAverage(p.sections, section.key);
+      txt += `\n${fmtDate(p.date)}${p.coach?` — ${p.coach}`:''} (grille ${niveauLabel(p.niveau)})\n`;
+      gridFor(p.niveau).forEach(section=>{
+        const avg = sectionAverage(p.sections, section.key, p.niveau);
         if(avg!==null){
           txt += `  ${section.label} : ${avg.toFixed(1)}/4\n`;
           section.criteria.forEach(c=>{
@@ -1518,7 +1688,12 @@ function bindEvents(){
     formAddStudentEleves.addEventListener('submit', async e=>{
       e.preventDefault();
       const fd = new FormData(formAddStudentEleves);
-      const s = {id:uid(), prenom:fd.get('prenom').trim(), nom:fd.get('nom').trim(), parentEmail:(fd.get('email')||'').trim(), groupId:fd.get('groupId')};
+      const s = {
+        id:uid(), prenom:fd.get('prenom').trim(), nom:fd.get('nom').trim(),
+        dateNaissance: fd.get('dateNaissance') || null,
+        parentEmail:(fd.get('email')||'').trim(), groupId:fd.get('groupId'),
+        niveau: fd.get('niveau') || 'debutant'
+      };
       if(!s.prenom || !s.nom || !s.groupId) return;
       state.students.push(s);
       await saveState();
@@ -1549,7 +1724,9 @@ function bindEvents(){
       if(!s) return;
       s.prenom = fd.get('prenom').trim();
       s.nom = fd.get('nom').trim();
+      s.dateNaissance = fd.get('dateNaissance') || null;
       s.groupId = fd.get('groupId');
+      s.niveau = fd.get('niveau') || 'debutant';
       s.parentEmail = (fd.get('email')||'').trim();
       ui.editingStudentId = null;
       await saveState();
@@ -1613,14 +1790,26 @@ function bindEvents(){
   });
   const selPerf = document.getElementById('select-perf-student');
   if(selPerf) selPerf.addEventListener('change', ()=>{ ui.perfStudent = selPerf.value; render(); });
+  const selPerfNiveau = document.getElementById('select-perf-niveau');
+  if(selPerfNiveau){
+    selPerfNiveau.addEventListener('change', async ()=>{
+      const st = studentById(selPerfNiveau.dataset.studentId);
+      if(!st) return;
+      st.niveau = selPerfNiveau.value;
+      await saveState();
+      showToast('Niveau mis à jour.');
+      render();
+    });
+  }
 
   const formAddEval = document.getElementById('form-add-eval');
   if(formAddEval){
     formAddEval.addEventListener('submit', async e=>{
       e.preventDefault();
       const fd = new FormData(formAddEval);
+      const evalNiveau = formAddEval.dataset.evalNiveau || 'debutant';
       const sections = {};
-      EVAL_SECTIONS.forEach(section=>{
+      gridFor(evalNiveau).forEach(section=>{
         sections[section.key] = {};
         section.criteria.forEach(c=>{
           const v = fd.get(`s_${section.key}__${c.key}`);
@@ -1639,6 +1828,7 @@ function bindEvents(){
         id:uid(), studentId:ui.perfStudent, date:fd.get('date'),
         coach: fd.has('coachId') ? (()=>{ const c=coachById(fd.get('coachId')); return c ? c.prenom+' '+c.nom : ''; })() : (fd.get('coach')||'').trim(),
         coachId: fd.has('coachId') ? (fd.get('coachId')||null) : null,
+        niveau: evalNiveau,
         niveauGroupe: student ? (groupById(student.groupId)?.nom || '') : '',
         sections, indicateurs,
         pointsForts:(fd.get('pointsForts')||'').trim(),
