@@ -228,6 +228,9 @@
   @media(max-width:560px){
     .eval-criterion{grid-template-columns:1fr;}
   }
+  .flagmark-slot{width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;}
+  .color-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;}
+  input[type=color]{height:42px;padding:3px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -253,11 +256,13 @@
 <div id="main-app" style="display:none;">
 <header class="top">
   <div class="wrap">
-    <svg class="flagmark" viewBox="0 0 24 24" fill="none">
-      <line x1="5" y1="2" x2="5" y2="22" stroke="#F1E4B8" stroke-width="2" stroke-linecap="round"/>
-      <path d="M5 3 L18 6 L5 10 Z" fill="#C9A227"/>
-      <circle cx="5" cy="22" r="1.6" fill="#F1E4B8"/>
-    </svg>
+    <div id="header-logo" class="flagmark-slot">
+      <svg class="flagmark" viewBox="0 0 24 24" fill="none">
+        <line x1="5" y1="2" x2="5" y2="22" stroke="#F1E4B8" stroke-width="2" stroke-linecap="round"/>
+        <path d="M5 3 L18 6 L5 10 Z" fill="#C9A227"/>
+        <circle cx="5" cy="22" r="1.6" fill="#F1E4B8"/>
+      </svg>
+    </div>
     <div>
       <h1>Golf du Cognac</h1>
       <p>Suivi des cours &amp; des élèves</p>
@@ -277,7 +282,13 @@
 /* ---------------------------------------------------------
    ÉTAT
 --------------------------------------------------------- */
-let state = { groups: [], students: [], sessions: [], performance: [], objectifs: [], coaches: [] };
+const DEFAULT_COLORS = { header:'#173A2E', boutons:'#2C6650', accent:'#C9A227', fond:'#F6F3EA' };
+const DEFAULT_LOGO_SVG = `<svg class="flagmark" viewBox="0 0 24 24" fill="none">
+  <line x1="5" y1="2" x2="5" y2="22" stroke="#F1E4B8" stroke-width="2" stroke-linecap="round"/>
+  <path d="M5 3 L18 6 L5 10 Z" fill="var(--sand)"/>
+  <circle cx="5" cy="22" r="1.6" fill="#F1E4B8"/>
+</svg>`;
+let state = { groups: [], students: [], sessions: [], performance: [], objectifs: [], coaches: [], settings: { logoDataUrl: null, colors: { ...DEFAULT_COLORS } } };
 let ui = {
   tab: 'dashboard',
   selGroupManage: null,
@@ -338,6 +349,20 @@ const EVAL_SECTIONS = [
       {key:'respect_terrain', label:'Respect du terrain', desc:'Relevage des pitchs, remplacement des divots, ratissage des bunkers.'},
       {key:'gestion_emotions', label:'Gestion des émotions', desc:'Résilience face aux mauvais coups et concentration.'}
     ]
+  },
+  {
+    key:'etiquette', label:'Étiquette du Golf',
+    objectif:'Respecter les valeurs et les codes du jeu, sur le parcours comme envers les autres.',
+    criteria:[
+      {key:'respect_partenaires', label:'Respect des partenaires', desc:'Courtoisie, silence et respect du jeu des autres joueurs.'},
+      {key:'respect_parcours', label:'Respect du Parcours', desc:'Entretien et préservation du terrain et de ses infrastructures.'},
+      {key:'respect_coach', label:'Respect du Coach', desc:'Écoute et application des consignes données par le coach.'},
+      {key:'securite', label:'Sécurité', desc:'Vigilance constante pour la sécurité de soi et des autres.'},
+      {key:'rythme_jeu', label:'Rythme de jeu', desc:"Maintien d'une cadence de jeu fluide, sans retard excessif."},
+      {key:'greens', label:'Sur les Greens', desc:'Ne pas marcher sur la ligne de putt, réparer les pitchs, gérer le drapeau correctement.'},
+      {key:'bunkers', label:'Dans les Bunkers', desc:'Entrer et sortir du bon côté, ratisser après le passage.'},
+      {key:'fairways', label:'Sur les Fairways', desc:'Replacer les divots, préserver le sol de jeu.'}
+    ]
   }
 ];
 
@@ -346,8 +371,8 @@ const EVAL_SECTIONS = [
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -379,6 +404,9 @@ async function loadState(){
       state.performance = state.performance || [];
       state.objectifs = state.objectifs || [];
       state.coaches = state.coaches || [];
+      state.settings = state.settings || {};
+      state.settings.colors = state.settings.colors || { ...DEFAULT_COLORS };
+      if(state.settings.logoDataUrl === undefined) state.settings.logoDataUrl = null;
     }
   }catch(e){
     // Si la ligne n'existe pas encore, on la crée avec un état vide
@@ -411,6 +439,7 @@ async function showAppScreen(){
   document.getElementById('main-app').style.display = 'block';
   document.getElementById('app').innerHTML = `<div class="empty">Chargement des données…</div>`;
   await loadState();
+  applyTheme();
   render();
 }
 function bindAuthEvents(){
@@ -438,6 +467,20 @@ function showToast(msg){
   showToast._t = setTimeout(()=>t.classList.remove('show'), 2200);
 }
 
+function applyTheme(){
+  const colors = (state.settings && state.settings.colors) || DEFAULT_COLORS;
+  const root = document.documentElement;
+  root.style.setProperty('--green-900', colors.header || DEFAULT_COLORS.header);
+  root.style.setProperty('--green-700', colors.boutons || DEFAULT_COLORS.boutons);
+  root.style.setProperty('--sand', colors.accent || DEFAULT_COLORS.accent);
+  root.style.setProperty('--cream', colors.fond || DEFAULT_COLORS.fond);
+  const logoSlot = document.getElementById('header-logo');
+  if(logoSlot){
+    const logo = state.settings && state.settings.logoDataUrl;
+    logoSlot.innerHTML = logo ? `<img src="${logo}" alt="Logo du club" style="width:34px;height:34px;object-fit:contain;border-radius:6px;">` : DEFAULT_LOGO_SVG;
+  }
+}
+
 /* ---------------------------------------------------------
    TABS
 --------------------------------------------------------- */
@@ -448,8 +491,9 @@ const TABS = [
   {id:'eleves', label:'Élèves'},
   {id:'presences', label:'Présences'},
   {id:'alertes', label:'Alertes'},
-  {id:'performance', label:'Performance'},
-  {id:'bulletins', label:'Bulletins'}
+  {id:'performance', label:'Évaluation & Performance'},
+  {id:'bulletins', label:'Bulletins'},
+  {id:'parametres', label:'Paramétrage'}
 ];
 function renderTabs(){
   const nav = document.getElementById('tabs');
@@ -518,6 +562,7 @@ function render(){
   else if(ui.tab==='alertes') app.innerHTML = viewAlertes();
   else if(ui.tab==='performance') app.innerHTML = viewPerformance();
   else if(ui.tab==='bulletins') app.innerHTML = viewBulletins();
+  else if(ui.tab==='parametres') app.innerHTML = viewParametres();
   bindEvents();
 }
 
@@ -898,7 +943,7 @@ function globalAverage(sections){
 
 function viewPerformance(){
   return `
-    <h2 class="section-title">Performance</h2>
+    <h2 class="section-title">Évaluation & Performance</h2>
     <p class="section-sub">Évaluations techniques, objectifs individuels et statistiques pédagogiques.</p>
     <div class="inline-actions" style="margin-bottom:16px;">
       <button class="btn ${ui.performanceSubTab==='fiche'?'':'secondary'} small" data-perf-subtab="fiche">Fiche élève</button>
@@ -1268,6 +1313,55 @@ function generateBulletinText(student, monthStr, appreciation){
 }
 
 /* ---------------------------------------------------------
+   VUE : PARAMÉTRAGE
+--------------------------------------------------------- */
+function viewParametres(){
+  const colors = (state.settings && state.settings.colors) || DEFAULT_COLORS;
+  const logo = state.settings && state.settings.logoDataUrl;
+  return `
+    <h2 class="section-title">Paramétrage</h2>
+    <p class="section-sub">Personnalisez l'identité visuelle de votre club : logo et couleurs du site.</p>
+
+    <div class="card">
+      <h3 class="perf-h">Logo du club</h3>
+      ${ logo ? `<img src="${logo}" alt="Logo du club" style="max-width:120px;max-height:120px;display:block;margin-bottom:12px;border-radius:10px;border:1px solid var(--line);">` :
+        `<p class="helper" style="margin-bottom:12px;">Aucun logo importé — le drapeau par défaut est utilisé.</p>` }
+      <div class="inline-actions">
+        <label class="btn secondary small" style="cursor:pointer;">
+          Choisir un logo
+          <input type="file" id="input-logo-upload" accept="image/*" style="display:none;">
+        </label>
+        ${ logo ? `<button class="btn danger small" id="btn-remove-logo">Retirer le logo</button>` : '' }
+      </div>
+      <p class="helper" style="margin-top:10px;">Formats image classiques (PNG, JPG, SVG). Préférez un fichier léger (moins de 300 Ko) pour un chargement rapide.</p>
+    </div>
+
+    <div class="card">
+      <h3 class="perf-h">Couleurs du site</h3>
+      <div class="color-grid">
+        <div class="field">
+          <label>Couleur principale (en-tête)</label>
+          <input type="color" data-color-key="header" value="${colors.header}">
+        </div>
+        <div class="field">
+          <label>Couleur des boutons</label>
+          <input type="color" data-color-key="boutons" value="${colors.boutons}">
+        </div>
+        <div class="field">
+          <label>Couleur d'accent (bordures, pastilles)</label>
+          <input type="color" data-color-key="accent" value="${colors.accent}">
+        </div>
+        <div class="field">
+          <label>Couleur de fond</label>
+          <input type="color" data-color-key="fond" value="${colors.fond}">
+        </div>
+      </div>
+      <button class="btn secondary small" id="btn-reset-colors" style="margin-top:14px;">Réinitialiser les couleurs par défaut</button>
+    </div>
+  `;
+}
+
+/* ---------------------------------------------------------
    ÉVÉNEMENTS
 --------------------------------------------------------- */
 function bindEvents(){
@@ -1276,6 +1370,59 @@ function bindEvents(){
   app.querySelectorAll('[data-goto]').forEach(b=>{
     b.addEventListener('click', ()=>{ ui.tab = b.dataset.goto; render(); });
   });
+
+  // --- PARAMÉTRAGE ---
+  const inputLogo = document.getElementById('input-logo-upload');
+  if(inputLogo){
+    inputLogo.addEventListener('change', ()=>{
+      const file = inputLogo.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = async ()=>{
+        state.settings = state.settings || {};
+        state.settings.logoDataUrl = reader.result;
+        await saveState();
+        applyTheme();
+        showToast('Logo mis à jour.');
+        render();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  const btnRemoveLogo = document.getElementById('btn-remove-logo');
+  if(btnRemoveLogo){
+    btnRemoveLogo.addEventListener('click', async ()=>{
+      state.settings = state.settings || {};
+      state.settings.logoDataUrl = null;
+      await saveState();
+      applyTheme();
+      showToast('Logo retiré.');
+      render();
+    });
+  }
+  app.querySelectorAll('[data-color-key]').forEach(el=>{
+    el.addEventListener('input', ()=>{
+      state.settings = state.settings || {};
+      state.settings.colors = state.settings.colors || { ...DEFAULT_COLORS };
+      state.settings.colors[el.dataset.colorKey] = el.value;
+      applyTheme();
+    });
+    el.addEventListener('change', async ()=>{
+      await saveState();
+      showToast('Couleur mise à jour.');
+    });
+  });
+  const btnResetColors = document.getElementById('btn-reset-colors');
+  if(btnResetColors){
+    btnResetColors.addEventListener('click', async ()=>{
+      state.settings = state.settings || {};
+      state.settings.colors = { ...DEFAULT_COLORS };
+      await saveState();
+      applyTheme();
+      showToast('Couleurs réinitialisées.');
+      render();
+    });
+  }
 
   // --- COACHS ---
   const formAddCoach = document.getElementById('form-add-coach');
