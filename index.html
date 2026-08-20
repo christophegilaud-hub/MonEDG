@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Golf du Cognac — Suivi des cours</title>
+<title>MonEDG — Suivi des cours</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -248,7 +248,7 @@
       <path d="M5 3 L18 6 L5 10 Z" fill="#C9A227"/>
       <circle cx="5" cy="22" r="1.6" fill="#173A2E"/>
     </svg>
-    <h1>Golf du Cognac</h1>
+    <h1>MonEDG</h1>
     <p>Connectez-vous avec le compte fourni par votre association.</p>
     <form id="form-login">
       <div class="field"><label>E-mail</label><input type="email" name="email" required autocomplete="username"></div>
@@ -270,7 +270,7 @@
       </svg>
     </div>
     <div>
-      <h1>Golf du Cognac</h1>
+      <h1>MonEDG</h1>
       <p>Suivi des cours &amp; des élèves</p>
     </div>
     <button class="logout-btn" id="btn-logout">Se déconnecter</button>
@@ -524,8 +524,8 @@ const PRIORITES_SUGGESTION = [
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -1762,7 +1762,7 @@ function generateBulletinText(student, monthStr, appreciation){
   const monthLabel = new Date(year, month-1, 1).toLocaleDateString('fr-FR',{month:'long', year:'numeric'});
 
   let txt = '';
-  txt += `Bulletin mensuel — Golf du Cognac\n`;
+  txt += `Bulletin mensuel — MonEDG\n`;
   txt += `${student.prenom} ${student.nom} — Groupe : ${group ? group.nom : '—'}\n`;
   txt += `Période : ${monthLabel}\n`;
 
@@ -1839,7 +1839,7 @@ function generateBulletinText(student, monthStr, appreciation){
     txt += `${appreciation.trim()}\n`;
   }
 
-  txt += `\nSportivement,\nL'équipe du Golf du Cognac`;
+  txt += `\nSportivement,\nL'équipe MonEDG`;
   return txt;
 }
 
