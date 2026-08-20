@@ -288,7 +288,7 @@ const DEFAULT_LOGO_SVG = `<svg class="flagmark" viewBox="0 0 24 24" fill="none">
   <path d="M5 3 L18 6 L5 10 Z" fill="var(--sand)"/>
   <circle cx="5" cy="22" r="1.6" fill="#F1E4B8"/>
 </svg>`;
-let state = { groups: [], students: [], sessions: [], performance: [], objectifs: [], coaches: [], settings: { logoDataUrl: null, colors: { ...DEFAULT_COLORS } } };
+let state = { groups: [], students: [], sessions: [], performance: [], objectifs: [], coaches: [], suggestions: [], settings: { logoDataUrl: null, colors: { ...DEFAULT_COLORS } } };
 let ui = {
   tab: 'dashboard',
   selGroupManage: null,
@@ -300,6 +300,7 @@ let ui = {
   editingCoachId: null,
   dashPeriodStart: null,
   dashPeriodEnd: null,
+  suggestionsFilterStatut: 'all',
   bulletinStudent: null,
   bulletinMonth: monthISO(new Date()),
   elevesFilterGroup: 'all',
@@ -496,13 +497,26 @@ function niveauLabel(niveau){
   return n ? n.label : 'Confirmé';
 }
 
+const STATUTS_SUGGESTION = [
+  {key:'a_letude', label:"À l'étude"},
+  {key:'planifie', label:'Planifié'},
+  {key:'en_cours', label:'En cours'},
+  {key:'fait', label:'Fait'},
+  {key:'abandonne', label:'Abandonné'}
+];
+const PRIORITES_SUGGESTION = [
+  {key:'haute', label:'Haute'},
+  {key:'normale', label:'Normale'},
+  {key:'basse', label:'Basse'}
+];
+
 /* ---------------------------------------------------------
    CONFIGURATION SUPABASE
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -534,6 +548,7 @@ async function loadState(){
       state.performance = state.performance || [];
       state.objectifs = state.objectifs || [];
       state.coaches = state.coaches || [];
+      state.suggestions = state.suggestions || [];
       state.settings = state.settings || {};
       state.settings.colors = state.settings.colors || { ...DEFAULT_COLORS };
       if(state.settings.logoDataUrl === undefined) state.settings.logoDataUrl = null;
@@ -623,6 +638,7 @@ const TABS = [
   {id:'alertes', label:'Alertes'},
   {id:'performance', label:'Évaluation & Performance'},
   {id:'bulletins', label:'Bulletins'},
+  {id:'suggestions', label:'Suggestions & Roadmap'},
   {id:'parametres', label:'Paramétrage'}
 ];
 function renderTabs(){
@@ -692,6 +708,7 @@ function render(){
   else if(ui.tab==='alertes') app.innerHTML = viewAlertes();
   else if(ui.tab==='performance') app.innerHTML = viewPerformance();
   else if(ui.tab==='bulletins') app.innerHTML = viewBulletins();
+  else if(ui.tab==='suggestions') app.innerHTML = viewSuggestions();
   else if(ui.tab==='parametres') app.innerHTML = viewParametres();
   bindEvents();
 }
@@ -1554,6 +1571,83 @@ function generateBulletinText(student, monthStr, appreciation){
 }
 
 /* ---------------------------------------------------------
+   VUE : SUGGESTIONS & ROADMAP
+--------------------------------------------------------- */
+function viewSuggestions(){
+  let list = state.suggestions.slice();
+  if(ui.suggestionsFilterStatut !== 'all') list = list.filter(s=>s.statut===ui.suggestionsFilterStatut);
+  const prioRank = {haute:0, normale:1, basse:2};
+  list.sort((a,b)=> (prioRank[a.priorite]-prioRank[b.priorite]) || (b.dateCreation||'').localeCompare(a.dateCreation||''));
+
+  const nbALetude = state.suggestions.filter(s=>s.statut==='a_letude').length;
+  const nbEnCours = state.suggestions.filter(s=>s.statut==='en_cours').length;
+  const nbFait = state.suggestions.filter(s=>s.statut==='fait').length;
+
+  return `
+    <h2 class="section-title">Suggestions & Roadmap</h2>
+    <p class="section-sub">Les demandes d'évolution et idées à suivre pour l'application.</p>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num">${state.suggestions.length}</div><div class="label">Suggestions au total</div></div>
+      <div class="stat"><div class="num">${nbALetude}</div><div class="label">À l'étude</div></div>
+      <div class="stat"><div class="num">${nbEnCours}</div><div class="label">En cours</div></div>
+      <div class="stat"><div class="num">${nbFait}</div><div class="label">Réalisées</div></div>
+    </div>
+
+    <div class="card">
+      <h3 class="perf-h">Nouvelle suggestion</h3>
+      <form id="form-add-suggestion">
+        <div class="form-grid">
+          <div class="field"><label>Titre</label><input type="text" name="titre" placeholder="Ex : Export CSV des présences" required></div>
+          <div class="field"><label>Demandé par</label><input type="text" name="demandeur" placeholder="Nom (optionnel)"></div>
+          <div class="field"><label>Priorité</label>
+            <select name="priorite">
+              ${PRIORITES_SUGGESTION.map(p=>`<option value="${p.key}" ${p.key==='normale'?'selected':''}>${p.label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:12px;"><label>Description</label><textarea name="description" rows="3" placeholder="Détaillez le besoin ou l'idée..."></textarea></div>
+        <button class="btn" type="submit">Ajouter la suggestion</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="field" style="max-width:280px;margin-bottom:14px;">
+        <label>Filtrer par statut</label>
+        <select id="select-suggestions-filter">
+          <option value="all" ${ui.suggestionsFilterStatut==='all'?'selected':''}>Tous les statuts</option>
+          ${STATUTS_SUGGESTION.map(s=>`<option value="${s.key}" ${ui.suggestionsFilterStatut===s.key?'selected':''}>${s.label}</option>`).join('')}
+        </select>
+      </div>
+
+      ${ list.length===0 ? `<div class="empty">Aucune suggestion ${ui.suggestionsFilterStatut!=='all'?'pour ce statut':"pour l'instant"}.</div>` :
+        list.map(s=>{
+          const prioLabel = (PRIORITES_SUGGESTION.find(p=>p.key===s.priorite)||{}).label || s.priorite;
+          const prioClass = s.priorite==='haute' ? 'bad' : s.priorite==='basse' ? 'ok' : 'warn';
+          return `
+          <div class="eval-history-card">
+            <div class="row-between">
+              <div>
+                <span class="pill ${prioClass}">${esc(prioLabel)}</span>
+                <strong style="margin-left:8px;">${esc(s.titre)}</strong>
+              </div>
+              <button class="btn danger small" data-delete-suggestion="${s.id}">Suppr.</button>
+            </div>
+            ${s.description?`<div class="helper" style="margin-top:8px;">${esc(s.description)}</div>`:''}
+            <div class="row-between" style="margin-top:10px;">
+              <span class="helper">${s.demandeur?`Demandé par ${esc(s.demandeur)} · `:''}${s.dateCreation?fmtDate(s.dateCreation):''}</span>
+              <select data-suggestion-status="${s.id}">
+                ${STATUTS_SUGGESTION.map(st=>`<option value="${st.key}" ${s.statut===st.key?'selected':''}>${st.label}</option>`).join('')}
+              </select>
+            </div>
+          </div>`;
+        }).join('')
+      }
+    </div>
+  `;
+}
+
+/* ---------------------------------------------------------
    VUE : PARAMÉTRAGE
 --------------------------------------------------------- */
 function viewParametres(){
@@ -1619,6 +1713,49 @@ function bindEvents(){
   if(inpDashEnd) inpDashEnd.addEventListener('change', ()=>{ ui.dashPeriodEnd = inpDashEnd.value || null; render(); });
   const btnDashReset = document.getElementById('btn-dash-reset-period');
   if(btnDashReset) btnDashReset.addEventListener('click', ()=>{ ui.dashPeriodStart = null; ui.dashPeriodEnd = null; render(); });
+
+  // --- SUGGESTIONS & ROADMAP ---
+  const formAddSuggestion = document.getElementById('form-add-suggestion');
+  if(formAddSuggestion){
+    formAddSuggestion.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const fd = new FormData(formAddSuggestion);
+      const titre = fd.get('titre').trim();
+      if(!titre) return;
+      state.suggestions.push({
+        id:uid(), titre,
+        demandeur:(fd.get('demandeur')||'').trim(),
+        priorite: fd.get('priorite') || 'normale',
+        description:(fd.get('description')||'').trim(),
+        statut:'a_letude',
+        dateCreation: todayISO()
+      });
+      await saveState();
+      showToast('Suggestion ajoutée.');
+      render();
+    });
+  }
+  const selSuggestionsFilter = document.getElementById('select-suggestions-filter');
+  if(selSuggestionsFilter) selSuggestionsFilter.addEventListener('change', ()=>{ ui.suggestionsFilterStatut = selSuggestionsFilter.value; render(); });
+  app.querySelectorAll('[data-suggestion-status]').forEach(el=>{
+    el.addEventListener('change', async ()=>{
+      const sug = state.suggestions.find(x=>x.id===el.dataset.suggestionStatus);
+      if(!sug) return;
+      sug.statut = el.value;
+      await saveState();
+      showToast('Statut mis à jour.');
+      render();
+    });
+  });
+  app.querySelectorAll('[data-delete-suggestion]').forEach(el=>{
+    el.addEventListener('click', async ()=>{
+      if(!confirm('Supprimer cette suggestion ?')) return;
+      state.suggestions = state.suggestions.filter(x=>x.id!==el.dataset.deleteSuggestion);
+      await saveState();
+      showToast('Suggestion supprimée.');
+      render();
+    });
+  });
 
   // --- PARAMÉTRAGE ---
   const inputLogo = document.getElementById('input-logo-upload');
