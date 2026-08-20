@@ -231,6 +231,12 @@
   .flagmark-slot{width:34px;height:34px;flex:none;display:flex;align-items:center;justify-content:center;}
   .color-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;}
   input[type=color]{height:42px;padding:3px;cursor:pointer;}
+  .presence-toggle{display:inline-flex;gap:4px;}
+  .ptoggle-btn{font-family:'Inter',sans-serif;font-size:.72rem;font-weight:600;padding:6px 9px;border-radius:6px;border:1px solid var(--line);background:var(--white);color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
+  .ptoggle-btn:hover{border-color:var(--green-500);}
+  .ptoggle-btn.active-present{background:var(--green-700);border-color:var(--green-700);color:var(--white);}
+  .ptoggle-btn.active-absent{background:var(--red);border-color:var(--red);color:var(--white);}
+  .ptoggle-btn.active-justifiee{background:var(--sand);border-color:var(--sand);color:var(--white);}
 </style>
 </head>
 <body>
@@ -518,8 +524,8 @@ const PRIORITES_SUGGESTION = [
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -671,8 +677,7 @@ function saisonById(id){ return state.saisons.find(s=>s.id===id); }
 function defaultSaisonLabel(){
   const now = new Date();
   const y = now.getFullYear();
-  const m = now.getMonth()+1;
-  return m>=9 ? `${y}/${y+1}` : `${y-1}/${y}`;
+  return `${y}/${y+1}`;
 }
 function nextSaisonLabel(label){
   const parts = (label||'').split('/').map(Number);
@@ -705,6 +710,14 @@ function sessionsOfGroup(groupId){
 }
 
 // Calcule, pour un élève, la série d'absences consécutives la plus récente
+// Normalise une valeur de présence brute (booléen historique ou statut texte) vers 'present' | 'absent' | 'justifiee' | undefined
+function normalizePresence(raw){
+  if(raw === true) return 'present';
+  if(raw === false) return 'absent';
+  if(raw === undefined || raw === null || raw === '') return undefined;
+  return raw; // 'present' | 'absent' | 'justifiee'
+}
+
 function consecutiveAbsences(studentId){
   const st = studentById(studentId);
   if(!st) return {count:0,lastPresent:null};
@@ -712,9 +725,10 @@ function consecutiveAbsences(studentId){
   let count = 0;
   let lastPresent = null;
   for(let i=sess.length-1;i>=0;i--){
-    const rec = sess[i].presences ? sess[i].presences[studentId] : undefined;
+    const rec = normalizePresence(sess[i].presences ? sess[i].presences[studentId] : undefined);
     if(rec === undefined) continue; // séance sans info pour cet élève -> on ignore
-    if(rec === true){ lastPresent = sess[i].date; break; }
+    if(rec === 'justifiee') continue; // absence justifiée -> ne compte pas dans la série d'alertes
+    if(rec === 'present'){ lastPresent = sess[i].date; break; }
     count++;
   }
   return {count, lastPresent};
@@ -763,9 +777,11 @@ function sessionsInDashPeriod(){
 function attendanceRate(sessions){
   let present = 0, total = 0;
   sessions.forEach(s=>{
-    Object.values(s.presences || {}).forEach(v=>{
-      if(v===true) present++;
-      if(v===true || v===false) total++;
+    Object.values(s.presences || {}).forEach(raw=>{
+      const v = normalizePresence(raw);
+      if(v===undefined || v==='justifiee') return; // absences justifiées exclues du calcul du taux
+      if(v==='present') present++;
+      total++;
     });
   });
   return total > 0 ? Math.round((present/total)*100) : null;
@@ -779,6 +795,13 @@ function evaluatedStudentsInDashPeriod(){
     ids.add(p.studentId);
   });
   return ids.size;
+}
+function stagesInDashPeriod(){
+  return state.stages.filter(st=>{
+    if(ui.dashPeriodStart && st.dateDebut < ui.dashPeriodStart) return false;
+    if(ui.dashPeriodEnd && st.dateDebut > ui.dashPeriodEnd) return false;
+    return true;
+  });
 }
 
 function viewDashboard(){
@@ -799,6 +822,13 @@ function viewDashboard(){
     const gSessions = periodSessions.filter(s=>s.groupId===g.id);
     return { group:g, nbSeances:gSessions.length, rate: attendanceRate(gSessions) };
   });
+
+  const periodStages = stagesInDashPeriod();
+  const nbStagesSansCoach = periodStages.filter(st=>!st.coachId).length;
+  const stagesByCoach = state.coaches.map(c=>({
+    coach: c,
+    nb: periodStages.filter(st=>st.coachId===c.id).length
+  })).filter(x=>x.nb>0).sort((a,b)=>b.nb-a.nb);
 
   return `
     <h2 class="section-title">Vue d'ensemble</h2>
@@ -836,6 +866,21 @@ function viewDashboard(){
               <td>${g.rate!==null?`<span class="pill ${g.rate>=80?'ok':g.rate>=50?'warn':'bad'}">${g.rate}%</span>`:'<span class="helper">aucune séance</span>'}</td>
             </tr>
           `).join('')}
+        </tbody></table>`
+      }
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 10px;font-family:'Fraunces',serif;color:var(--green-900);">Stages par coach</h3>
+      ${ periodStages.length===0 ? `<div class="empty">Aucun stage sur cette période.</div>` :
+        `<table><thead><tr><th>Coach</th><th>Stages (période)</th></tr></thead><tbody>
+          ${stagesByCoach.map(x=>`
+            <tr>
+              <td>${esc(x.coach.prenom)} ${esc(x.coach.nom)}</td>
+              <td>${x.nb}</td>
+            </tr>
+          `).join('')}
+          ${ nbStagesSansCoach>0 ? `<tr><td><span class="helper">Sans coach assigné</span></td><td>${nbStagesSansCoach}</td></tr>` : '' }
         </tbody></table>`
       }
     </div>
@@ -947,6 +992,15 @@ function viewStages(){
           <div class="field"><label>Nom du stage</label><input type="text" name="nom" placeholder="Ex : Stage de printemps" required></div>
           <div class="field"><label>Date de début</label><input type="date" name="dateDebut" required></div>
           <div class="field"><label>Date de fin</label><input type="date" name="dateFin" required></div>
+          <div class="field"><label>Coach</label>
+            ${ state.coaches.length>0 ? `
+              <select name="coachId">
+                <option value="">— Non renseigné —</option>
+                ${state.coaches.map(c=>`<option value="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</option>`).join('')}
+              </select>` :
+              `<span class="helper">Créez des coachs dans l'onglet « Coachs ».</span>`
+            }
+          </div>
         </div>
         <div class="field" style="margin-bottom:12px;"><label>Objectifs du stage</label><textarea name="objectifs" rows="2" placeholder="Ex : Travail du petit jeu et mise en situation de parcours"></textarea></div>
         <button class="btn" type="submit">Créer le stage</button>
@@ -962,12 +1016,13 @@ function viewStages(){
 function viewStageCard(st){
   const opened = ui.openStageId === st.id;
   const participants = (st.participantIds||[]).map(id=>studentById(id)).filter(Boolean);
+  const coach = st.coachId ? coachById(st.coachId) : null;
   return `
     <div class="card">
       <div class="row-between">
         <div>
           <div class="name" style="font-weight:700;color:var(--green-900);">${esc(st.nom)}</div>
-          <div class="meta helper">${fmtDate(st.dateDebut)} → ${fmtDate(st.dateFin)} · ${participants.length} participant(s)</div>
+          <div class="meta helper">${fmtDate(st.dateDebut)} → ${fmtDate(st.dateFin)} · ${participants.length} participant(s)${coach?` · Coach : ${esc(coach.prenom)} ${esc(coach.nom)}`:''}</div>
         </div>
         <div class="inline-actions">
           <button class="btn secondary small" data-toggle-stage="${st.id}">${opened?'Fermer':'Gérer'}</button>
@@ -1202,7 +1257,7 @@ function viewPresences(){
 
   return `
     <h2 class="section-title">Présences</h2>
-    <p class="section-sub">Choisissez un groupe et une date de séance, puis cochez les élèves présents.</p>
+    <p class="section-sub">Choisissez un groupe et une date de séance, puis indiquez le statut de chaque élève (présent, absent, ou absence justifiée).</p>
 
     <div class="card">
       <div class="form-grid" style="align-items:end;">
@@ -1235,13 +1290,20 @@ function viewPresences(){
             <button type="button" class="btn secondary small" id="btn-mark-all-absent">Tout décocher</button>
           </div>
           <table>
-            <thead><tr><th>Élève</th><th style="text-align:center;">Présent</th></tr></thead>
+            <thead><tr><th>Élève</th><th style="text-align:center;">Statut</th></tr></thead>
             <tbody>
               ${eleves.map(s=>{
-                const checked = session && session.presences && session.presences[s.id] === true;
-                return `<tr>
+                const status = (session && session.presences ? normalizePresence(session.presences[s.id]) : undefined) || 'absent';
+                return `<tr data-student-row="${s.id}">
                   <td>${esc(s.prenom)} ${esc(s.nom)}</td>
-                  <td style="text-align:center;"><input type="checkbox" name="${s.id}" ${checked?'checked':''}></td>
+                  <td style="text-align:center;">
+                    <input type="hidden" name="${s.id}" value="${status}">
+                    <div class="presence-toggle">
+                      <button type="button" class="ptoggle-btn ${status==='present'?'active-present':''}" data-presence-set="${s.id}|present">Présent</button>
+                      <button type="button" class="ptoggle-btn ${status==='absent'?'active-absent':''}" data-presence-set="${s.id}|absent">Absent</button>
+                      <button type="button" class="ptoggle-btn ${status==='justifiee'?'active-justifiee':''}" data-presence-set="${s.id}|justifiee">Justifiée</button>
+                    </div>
+                  </td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -1254,13 +1316,14 @@ function viewPresences(){
     ${ groupId && past.length>0 ? `
     <div class="card">
       <h3 style="margin-top:0;font-family:'Fraunces',serif;color:var(--green-900);">Séances récentes</h3>
-      <table><thead><tr><th>Date</th><th>Coach</th><th>Présents</th><th>Absents</th></tr></thead><tbody>
+      <table><thead><tr><th>Date</th><th>Coach</th><th>Présents</th><th>Absents</th><th>Justifiées</th></tr></thead><tbody>
         ${past.map(s=>{
-          const vals = Object.values(s.presences||{});
-          const present = vals.filter(v=>v===true).length;
-          const absent = vals.filter(v=>v===false).length;
+          const vals = Object.values(s.presences||{}).map(normalizePresence);
+          const present = vals.filter(v=>v==='present').length;
+          const absent = vals.filter(v=>v==='absent').length;
+          const justifiee = vals.filter(v=>v==='justifiee').length;
           const coach = s.coachId ? coachById(s.coachId) : null;
-          return `<tr><td>${fmtDate(s.date)}</td><td>${coach?esc(coach.prenom)+' '+esc(coach.nom):'—'}</td><td>${present}</td><td>${absent}</td></tr>`;
+          return `<tr><td>${fmtDate(s.date)}</td><td>${coach?esc(coach.prenom)+' '+esc(coach.nom):'—'}</td><td>${present}</td><td>${absent}</td><td>${justifiee}</td></tr>`;
         }).join('')}
       </tbody></table>
     </div>` : ''}
@@ -1638,9 +1701,15 @@ function generateBulletinText(student, monthStr, appreciation){
     return y===year && m===month;
   }).sort((a,b)=>a.date.localeCompare(b.date));
   const total = sessions.length;
-  let present = 0;
-  sessions.forEach(s=>{ if(s.presences && s.presences[student.id]===true) present++; });
-  const pct = total>0 ? Math.round((present/total)*100) : null;
+  let present = 0, absent = 0, justifiee = 0;
+  sessions.forEach(s=>{
+    const v = normalizePresence(s.presences ? s.presences[student.id] : undefined);
+    if(v==='present') present++;
+    else if(v==='absent') absent++;
+    else if(v==='justifiee') justifiee++;
+  });
+  const consideredTotal = present + absent; // absences justifiées exclues du taux
+  const pct = consideredTotal>0 ? Math.round((present/consideredTotal)*100) : null;
 
   const perfEntries = state.performance.filter(p=>{
     if(!p.sections) return false;
@@ -1651,6 +1720,14 @@ function generateBulletinText(student, monthStr, appreciation){
   const objectifs = state.objectifs.filter(o=>o.studentId===student.id)
     .sort((a,b)=>(b.dateCreation||'').localeCompare(a.dateCreation||''));
   const statutLabel = {en_cours:'En cours', atteint:'Atteint', abandonne:'Abandonné'};
+
+  const monthFirstDay = `${year}-${String(month).padStart(2,'0')}-01`;
+  const monthLastDayNum = new Date(year, month, 0).getDate();
+  const monthLastDay = `${year}-${String(month).padStart(2,'0')}-${String(monthLastDayNum).padStart(2,'0')}`;
+  const stagesDuMois = state.stages.filter(st=>
+    (st.participantIds||[]).includes(student.id) &&
+    st.dateDebut <= monthLastDay && st.dateFin >= monthFirstDay
+  ).sort((a,b)=>a.dateDebut.localeCompare(b.dateDebut));
 
   const monthLabel = new Date(year, month-1, 1).toLocaleDateString('fr-FR',{month:'long', year:'numeric'});
 
@@ -1664,12 +1741,14 @@ function generateBulletinText(student, monthStr, appreciation){
     txt += `Aucune séance enregistrée ce mois-ci pour ce groupe.\n`;
   }else{
     txt += `Séances prévues : ${total}\n`;
-    txt += `Présences : ${present}/${total} (${pct}%)\n\n`;
-    txt += `Détail des séances :\n`;
+    txt += `Présences : ${present}/${consideredTotal}${pct!==null?` (${pct}%)`:''}\n`;
+    if(justifiee>0) txt += `Absences justifiées : ${justifiee}\n`;
+    txt += `\nDétail des séances :\n`;
     sessions.forEach(s=>{
-      const p = s.presences ? s.presences[student.id] : undefined;
+      const v = normalizePresence(s.presences ? s.presences[student.id] : undefined);
+      const label = v==='present'?'Présent':v==='absent'?'Absent':v==='justifiee'?'Absence justifiée':'Non renseigné';
       const coach = s.coachId ? coachById(s.coachId) : null;
-      txt += `- ${fmtDate(s.date)} : ${p===true?'Présent':p===false?'Absent':'Non renseigné'}${coach?` (coach : ${coach.prenom} ${coach.nom})`:''}\n`;
+      txt += `- ${fmtDate(s.date)} : ${label}${coach?` (coach : ${coach.prenom} ${coach.nom})`:''}\n`;
     });
   }
 
@@ -1699,6 +1778,19 @@ function generateBulletinText(student, monthStr, appreciation){
       }
       if(p.pointsForts) txt += `  Points forts : ${p.pointsForts}\n`;
       if(p.axesAmelioration) txt += `  Axes d'amélioration : ${p.axesAmelioration}\n`;
+    });
+  }
+
+  txt += `\n=== Participation aux stages ===\n`;
+  if(stagesDuMois.length===0){
+    txt += `Aucun stage sur cette période.\n`;
+  }else{
+    stagesDuMois.forEach(st=>{
+      const coach = st.coachId ? coachById(st.coachId) : null;
+      txt += `\n${st.nom} (${fmtDate(st.dateDebut)} → ${fmtDate(st.dateFin)})${coach?` — coach : ${coach.prenom} ${coach.nom}`:''}\n`;
+      if(st.objectifs) txt += `  Objectifs du stage : ${st.objectifs}\n`;
+      const commentaire = (st.commentaires && st.commentaires[student.id]) || '';
+      if(commentaire) txt += `  Commentaire : ${commentaire}\n`;
     });
   }
 
@@ -2146,6 +2238,7 @@ function bindEvents(){
       state.stages.push({
         id:uid(), nom, dateDebut, dateFin,
         objectifs:(fd.get('objectifs')||'').trim(),
+        coachId: fd.get('coachId') || null,
         saisonId: ui.selGroupSaison || state.saisonActiveId,
         participantIds: [], commentaires: {}
       });
@@ -2278,13 +2371,27 @@ function bindEvents(){
   const inpDate = document.getElementById('input-attendance-date');
   if(inpDate) inpDate.addEventListener('change', ()=>{ ui.attendanceDate = inpDate.value; render(); });
   const formAtt = document.getElementById('form-attendance');
+  function setRowStatus(row, status){
+    const hidden = row.querySelector('input[type=hidden]');
+    if(hidden) hidden.value = status;
+    row.querySelectorAll('.ptoggle-btn').forEach(b=>b.classList.remove('active-present','active-absent','active-justifiee'));
+    const btn = row.querySelector(`[data-presence-set$="|${status}"]`);
+    if(btn) btn.classList.add(`active-${status}`);
+  }
   const btnAllPresent = document.getElementById('btn-mark-all-present');
   if(btnAllPresent) btnAllPresent.addEventListener('click', ()=>{
-    formAtt.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked = true);
+    formAtt.querySelectorAll('tr[data-student-row]').forEach(row=>setRowStatus(row,'present'));
   });
   const btnAllAbsent = document.getElementById('btn-mark-all-absent');
   if(btnAllAbsent) btnAllAbsent.addEventListener('click', ()=>{
-    formAtt.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked = false);
+    formAtt.querySelectorAll('tr[data-student-row]').forEach(row=>setRowStatus(row,'absent'));
+  });
+  app.querySelectorAll('[data-presence-set]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const [studentId, status] = btn.dataset.presenceSet.split('|');
+      const row = btn.closest('tr[data-student-row]');
+      if(row) setRowStatus(row, status);
+    });
   });
   if(formAtt){
     formAtt.addEventListener('submit', async e=>{
@@ -2292,7 +2399,7 @@ function bindEvents(){
       const fd = new FormData(formAtt);
       const eleves = studentsOfGroup(ui.selGroupAttendance);
       const presences = {};
-      eleves.forEach(s=>{ presences[s.id] = fd.get(s.id) === 'on'; });
+      eleves.forEach(s=>{ presences[s.id] = fd.get(s.id) || 'absent'; });
       let session = state.sessions.find(s=>s.groupId===ui.selGroupAttendance && s.date===ui.attendanceDate);
       if(!session){
         session = {id:uid(), groupId:ui.selGroupAttendance, date:ui.attendanceDate, presences:{}};
