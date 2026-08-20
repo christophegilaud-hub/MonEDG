@@ -298,6 +298,8 @@ let ui = {
   perfStudent: null,
   performanceSubTab: 'fiche',
   editingCoachId: null,
+  dashPeriodStart: null,
+  dashPeriodEnd: null,
   bulletinStudent: null,
   bulletinMonth: monthISO(new Date()),
   elevesFilterGroup: 'all',
@@ -499,8 +501,8 @@ function niveauLabel(niveau){
    -> Collez ici l'URL et la clé "anon public" de votre projet
       Supabase (Settings > API dans le tableau de bord Supabase).
 --------------------------------------------------------- */
-const SUPABASE_URL = "https://dzyhqyaopansoaddeyhq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_GcDn03h9eOKGVPdTQYUokQ_euoxtpQi";
+const SUPABASE_URL = "COLLEZ_ICI_VOTRE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLLEZ_ICI_VOTRE_CLE_ANON_PUBLIC";
 const ROW_ID = 'golf-cognac'; // identifiant de la ligne unique qui stocke toutes les données
 
 const sb = (SUPABASE_URL.startsWith('http')) ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -697,6 +699,34 @@ function render(){
 /* ---------------------------------------------------------
    VUE : DASHBOARD
 --------------------------------------------------------- */
+function sessionsInDashPeriod(){
+  return state.sessions.filter(s=>{
+    if(ui.dashPeriodStart && s.date < ui.dashPeriodStart) return false;
+    if(ui.dashPeriodEnd && s.date > ui.dashPeriodEnd) return false;
+    return true;
+  });
+}
+function attendanceRate(sessions){
+  let present = 0, total = 0;
+  sessions.forEach(s=>{
+    Object.values(s.presences || {}).forEach(v=>{
+      if(v===true) present++;
+      if(v===true || v===false) total++;
+    });
+  });
+  return total > 0 ? Math.round((present/total)*100) : null;
+}
+function evaluatedStudentsInDashPeriod(){
+  const ids = new Set();
+  state.performance.forEach(p=>{
+    if(!p.sections) return;
+    if(ui.dashPeriodStart && p.date < ui.dashPeriodStart) return;
+    if(ui.dashPeriodEnd && p.date > ui.dashPeriodEnd) return;
+    ids.add(p.studentId);
+  });
+  return ids.size;
+}
+
 function viewDashboard(){
   const nbGroupes = state.groups.length;
   const nbEleves = state.students.length;
@@ -705,6 +735,17 @@ function viewDashboard(){
   const topAlerts = alerts.slice(0,5);
   const nbObjectifsActifs = state.objectifs.filter(o=>o.statut==='en_cours').length;
   const nbCoachs = state.coaches.length;
+
+  const periodSessions = sessionsInDashPeriod();
+  const globalRate = attendanceRate(periodSessions);
+  const nbEvaluesPeriode = evaluatedStudentsInDashPeriod();
+  const hasPeriodFilter = !!(ui.dashPeriodStart || ui.dashPeriodEnd);
+
+  const groupRates = state.groups.map(g=>{
+    const gSessions = periodSessions.filter(s=>s.groupId===g.id);
+    return { group:g, nbSeances:gSessions.length, rate: attendanceRate(gSessions) };
+  });
+
   return `
     <h2 class="section-title">Vue d'ensemble</h2>
     <p class="section-sub">L'essentiel de la semaine, en un coup d'œil.</p>
@@ -715,6 +756,36 @@ function viewDashboard(){
       <div class="stat alert"><div class="num">${nbAlerts}</div><div class="label">Alertes actives</div></div>
       <div class="stat"><div class="num">${nbObjectifsActifs}</div><div class="label">Objectifs en cours</div></div>
     </div>
+
+    <div class="card">
+      <div class="row-between" style="margin-bottom:6px;">
+        <h3 style="margin:0;font-family:'Fraunces',serif;color:var(--green-900);">Présence &amp; évaluation</h3>
+        ${ hasPeriodFilter ? `<button class="btn secondary small" id="btn-dash-reset-period">Toute la période</button>` : '' }
+      </div>
+      <div class="form-grid" style="margin-bottom:14px;">
+        <div class="field"><label>Du</label><input type="date" id="input-dash-start" value="${ui.dashPeriodStart||''}"></div>
+        <div class="field"><label>Au</label><input type="date" id="input-dash-end" value="${ui.dashPeriodEnd||''}"></div>
+      </div>
+      <p class="helper" style="margin-bottom:14px;">${ hasPeriodFilter ? `Période sélectionnée : ${ui.dashPeriodStart?fmtDate(ui.dashPeriodStart):'début'} → ${ui.dashPeriodEnd?fmtDate(ui.dashPeriodEnd):"aujourd'hui"}` : 'Toute la période (aucun filtre appliqué).' }</p>
+
+      <div class="stat-row" style="margin-bottom:16px;">
+        <div class="stat"><div class="num">${globalRate!==null?globalRate+'%':'—'}</div><div class="label">Taux de présence global</div></div>
+        <div class="stat"><div class="num">${nbEvaluesPeriode}/${nbEleves}</div><div class="label">Élèves ayant eu une évaluation</div></div>
+      </div>
+
+      ${ groupRates.length===0 ? `<div class="empty">Aucun groupe créé pour l'instant.</div>` :
+        `<table><thead><tr><th>Groupe</th><th>Séances (période)</th><th>Taux de présence</th></tr></thead><tbody>
+          ${groupRates.map(g=>`
+            <tr>
+              <td>${esc(g.group.nom)}</td>
+              <td>${g.nbSeances}</td>
+              <td>${g.rate!==null?`<span class="pill ${g.rate>=80?'ok':g.rate>=50?'warn':'bad'}">${g.rate}%</span>`:'<span class="helper">aucune séance</span>'}</td>
+            </tr>
+          `).join('')}
+        </tbody></table>`
+      }
+    </div>
+
     <div class="card">
       <div class="row-between" style="margin-bottom:10px;">
         <h3 style="margin:0;font-family:'Fraunces',serif;color:var(--green-900);">Alertes récentes</h3>
@@ -1540,6 +1611,14 @@ function bindEvents(){
   app.querySelectorAll('[data-goto]').forEach(b=>{
     b.addEventListener('click', ()=>{ ui.tab = b.dataset.goto; render(); });
   });
+
+  // --- DASHBOARD : période ---
+  const inpDashStart = document.getElementById('input-dash-start');
+  if(inpDashStart) inpDashStart.addEventListener('change', ()=>{ ui.dashPeriodStart = inpDashStart.value || null; render(); });
+  const inpDashEnd = document.getElementById('input-dash-end');
+  if(inpDashEnd) inpDashEnd.addEventListener('change', ()=>{ ui.dashPeriodEnd = inpDashEnd.value || null; render(); });
+  const btnDashReset = document.getElementById('btn-dash-reset-period');
+  if(btnDashReset) btnDashReset.addEventListener('click', ()=>{ ui.dashPeriodStart = null; ui.dashPeriodEnd = null; render(); });
 
   // --- PARAMÉTRAGE ---
   const inputLogo = document.getElementById('input-logo-upload');
